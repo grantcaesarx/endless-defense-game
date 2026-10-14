@@ -1,0 +1,10 @@
+let hs = localStorage.getItem('krv_hs'); 
+let unlocked = localStorage.getItem('krv_heroes');
+let metaG = localStorage.getItem('krv_metaGold');
+let metaGe = localStorage.getItem('krv_metaGems');
+localStorage.clear();
+if(hs) localStorage.setItem('krv_hs', hs);
+if(unlocked) localStorage.setItem('krv_heroes', unlocked);
+if(metaG) localStorage.setItem('krv_metaGold', metaG);
+if(metaGe) localStorage.setItem('krv_metaGems', metaGe);
+console.log("Cleared corrupt map state.");

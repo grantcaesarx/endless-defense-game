@@ -1,0 +1,3099 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kingdom Defense: Endless Vector</title>
+    <meta name="description" content="An endless vector tower defense roguelike game featuring heroes, elemental boons, custom map editor, and tactical defenses.">
+    <meta property="og:title" content="Kingdom Defense: Endless Vector">
+    <meta property="og:description" content="An endless vector tower defense roguelike game featuring heroes, elemental boons, custom map editor, and tactical defenses.">
+    <script>
+  (function() {
+    let originalFetch = window.fetch;
+    Object.defineProperty(window, 'fetch', {
+      get: function() { return originalFetch; },
+      set: function(val) { originalFetch = val; },
+      configurable: true,
+      enumerable: true
+    });
+  })();
+</script>
+    <style>
+        :root { --p: #111; --s: #c2a669; --a: #facc15; --d: #ef4444; }
+        body, html { margin: 0; padding: 0; width: 100%; min-height: 100%; background: #000; color: #fff; font-family: 'Segoe UI', Tahoma, sans-serif; overflow-y: auto; overflow-x: hidden; touch-action: auto; user-select: none; -webkit-user-select: none; display: flex; align-items: flex-start; justify-content: center; }
+        #game-wrapper { position: relative; width: 100%; min-height: 100vh; max-width: 1024px; background: #000; box-shadow: 0 0 30px rgba(0,0,0,1); overflow: visible; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; }
+        @media (min-aspect-ratio: 4/3) { #game-wrapper { width: 100%; min-height: 100vh; } }
+        canvas { max-width: 100%; max-height: 100%; aspect-ratio: 4/3; object-fit: contain; display: block; image-rendering: pixelated; cursor: crosshair; touch-action: none; margin: auto; }
+        .screen { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; z-index: 10; transition: opacity 0.3s; pointer-events: none; } .screen > * { pointer-events: auto; }
+        
+        .hidden { display: none !important; opacity: 0; pointer-events: none; }
+        .pointer-events-none { pointer-events: none; }
+        .pointer-events-auto { pointer-events: auto; }
+        
+        /* UI Elements */
+        #ui-main-menu { background: rgba(0,0,0,0.85); position: absolute; inset: 0; width: 100%; height: 100%; align-items: center; justify-content: center; gap: 20px; z-index: 50; box-sizing: border-box; overflow-y: auto; }
+        h1 { color: var(--a); font-size: clamp(2.5rem, 6vw, 4rem); margin: 0; text-shadow: 0 6px 10px rgba(0,0,0,0.8); text-align: center; letter-spacing: 2px; }
+        .title-sub { color: #aaa; font-size: 1.2rem; margin-bottom: 20px; letter-spacing: 5px; }
+        button { background: #3b82f6; color: white; border: 2px solid #2563eb; padding: 14px 28px; font-size: 1.2rem; border-radius: 12px; cursor: pointer; transition: all 0.1s; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.6); box-shadow: 0 6px 0 #1d4ed8, 0 10px 10px rgba(0,0,0,0.5); }
+        button:active { transform: translateY(6px); box-shadow: 0 0px 0 #1d4ed8; }
+        button:hover { filter: brightness(1.2); }
+        .btn-green { background: #16a34a; border-color: #15803d; box-shadow: 0 6px 0 #166534; }
+        .btn-green:active { box-shadow: 0 0px 0 #166534; }
+        .btn-red { background: #dc2626; border-color: #b91c1c; box-shadow: 0 6px 0 #991b1b; }
+        .btn-red:active { box-shadow: 0 0px 0 #991b1b; }
+        .btn-yellow { background: #eab308; border-color: #ca8a04; box-shadow: 0 6px 0 #a16207; }
+        .btn-yellow:active { box-shadow: 0 0px 0 #a16207; }
+
+        /* HUD */
+        .hud-bar { background: linear-gradient(180deg, rgba(30,30,30,0.9), rgba(10,10,10,0.9)); padding: 8px 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #444; font-size: 1rem; text-shadow: 0 2px 2px #000; flex-wrap: wrap; gap: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        .hud-stat { display: flex; align-items: center; gap: 5px; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 8px; border: 1px solid #555; }
+        .hud-bar button { padding: 8px 16px; font-size: 0.9rem; box-shadow: 0 4px 0 #1d4ed8; border-radius: 8px; }
+        .hud-bar button:active { transform: translateY(4px); box-shadow: none; }
+        
+        /* Editor Toolbar */
+        .editor-bar { background: rgba(20,20,20,0.95); padding: 12px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; border-bottom: 3px solid #444; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: 90%; border-radius: 12px; }
+        .editor-bar button { font-size: 0.9rem; padding: 10px 15px; box-shadow: 0 4px 0 #1d4ed8; border-radius: 8px; }
+        .editor-bar button:active { transform: translateY(4px); }
+        .brush-active { background: #facc15; color: #000; box-shadow: 0 4px 0 #a16207; border-color: #ca8a04; text-shadow: none; }
+
+        /* Ring Menu */
+        #ring-menu { position: absolute; transform: translate(-50%, -50%); z-index: 30; pointer-events: none; width: 0; height: 0; }
+        .ring-btn { position: absolute; width: 64px; height: 64px; transform: translate(-50%, -50%); border-radius: 50%; border: 3px solid #555; background: radial-gradient(circle, #333, #111); color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; pointer-events: auto; box-shadow: 0 8px 15px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.2); transition: all 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275); text-shadow: 0 1px 2px #000; padding: 0; line-height: 1.1; }
+        .ring-btn span.cost { font-size: 0.8rem; color: #facc15; font-weight: bold; margin-top: 2px; }
+        .ring-btn span.desc { font-size: 0.65rem; color: #aaa; }
+        .ring-btn:hover { border-color: var(--a); transform: translate(-50%, -50%) scale(1.15); background: radial-gradient(circle, #444, #222); z-index: 10; }
+        .ring-btn:active { transform: translate(-50%, -50%) scale(0.95); }
+        .ring-btn.disabled { filter: grayscale(1) opacity(0.5); pointer-events: none; border-color: #333; }
+        .ring-btn.sell { border-color: #dc2626; }
+        .ring-btn.rally { border-color: #3b82f6; }
+
+        /* Boss HP Bar */
+        #boss-hp-container { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); width: 60%; max-width: 400px; background: rgba(17,17,17,0.85); border: 3px solid #555; border-radius: 10px; padding: 3px; z-index: 20; box-shadow: 0 5px 15px rgba(0,0,0,0.8); transition: opacity 0.3s; pointer-events: none; }
+        #boss-name { text-align: center; font-size: 0.9rem; font-weight: bold; color: #f87171; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; text-shadow: 0 1px 2px #000; }
+        #boss-hp-bar { height: 14px; background: linear-gradient(90deg, #dc2626, #991b1b); border-radius: 5px; width: 100%; transition: width 0.1s linear; }
+
+        /* Meta UI */
+        .meta-bar { position: relative; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; pointer-events: auto; z-index: 100; margin: 20px; }
+        .meta-btn { background: #1f2937; color: white; border: 2px solid #374151; border-radius: 8px; padding: 10px 15px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 0 #111827; }
+        .meta-btn:active { transform: translateY(4px); box-shadow: 0 0 0 #111827; }
+        
+        .modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1f2937; border: 4px solid #374151; border-radius: 12px; padding: 30px; display: flex; flex-direction: column; gap: 20px; z-index: 200; box-shadow: 0 20px 40px rgba(0,0,0,0.8); min-width: 400px; max-height: 90vh; overflow-y: auto; color: white; pointer-events: auto; }
+        .modal h2 { margin: 0; color: #facc15; text-align: center; }
+        
+        .hero-list { display: flex; gap: 15px; overflow-x: auto; padding: 10px 0; }
+        .hero-card { flex: 1; min-width: 150px; background: #374151; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid transparent; cursor: pointer; transition: all 0.2s; }
+        .hero-card:hover { filter: brightness(1.2); }
+        .hero-card.active { border-color: #3b82f6; box-shadow: 0 0 15px rgba(59,130,246,0.5); }
+        .hero-card.locked { opacity: 0.5; filter: grayscale(1); }
+        
+        .item-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; }
+        .item-card { background: #374151; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #4b5563; }
+        
+        .close-btn { position: absolute; top: -15px; right: -15px; background: #ef4444; color: white; border: 2px solid #b91c1c; border-radius: 50%; width: 40px; height: 40px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 0 #991b1b; }
+    
+        #ui-game { display: flex; flex-direction: column; height: 100vh; width: 100%; background: #000; overflow: hidden; position: absolute; inset: 0; }
+        #battlefield { flex: 1 1 0; height: 0; width: 100%; position: relative; display: flex; justify-content: center; align-items: center; background: #1a1a1a; overflow: hidden; }
+        
+        #dashboard { flex: 0 0 95px; display: none; width: 100%; background: #1e293b; border-top: 4px solid #0f172a; display: flex; padding: 6px 10px; box-sizing: border-box; color: white; user-select: none; flex-wrap: nowrap; overflow: hidden; align-items: center; }
+        .dashboard-left { width: 220px; border-right: 2px solid #334155; padding-right: 15px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .dashboard-tray { flex: 1; height: 100%; display: flex; overflow-x: auto; overflow-y: hidden; padding-left: 8px; gap: 8px; align-items: stretch; padding-bottom: 5px; scrollbar-width: thin; }
+        .item-card { background: #334155; border-radius: 8px; min-width: 125px; max-width: 145px; height: 100%; justify-content: flex-start; display: flex; flex-direction: column; padding: 8px; position: relative; box-sizing: border-box; cursor: pointer; border: 2px solid transparent; }
+        .item-card:hover { border-color: #3b82f6; }
+        .item-card.active { border-color: #22c55e; background: #166534; }
+        .item-qty { position: absolute; top: 5px; right: 5px; background: #dc2626; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .item-title { font-size: 14px; font-weight: bold; margin-bottom: 4px; text-align: center; margin-top: auto; }
+        .item-desc { font-size: 11px; color: #cbd5e1; text-align: center; margin-bottom: 8px; }
+        .item-buttons { display: flex; justify-content: space-between; margin-top: auto; gap: 6px; }
+        .btn-buy { flex: 1; background: #475569; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 4px; font-weight: bold; }
+        .btn-buy:hover { background: #64748b; }
+        .btn-buy.gold { color: #facc15; }
+        .btn-buy.gem { color: #38bdf8; }
+        .boon-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .boon-cards { display: flex; gap: 20px; margin-top: 30px; }
+        .boon-card { background: #1e293b; border: 2px solid #64748b; border-radius: 12px; padding: 20px; width: 280px; text-align: center; cursor: pointer; transition: transform 0.2s, border-color 0.2s; color: white; display: flex; flex-direction: column; gap: 10px; }
+        .boon-card:hover { transform: translateY(-10px); border-color: #facc15; }
+        .element-banner { position: absolute; top: 50px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 20px; color: white; font-weight: bold; font-size: 20px; border: 2px solid white; z-index: 50; pointer-events: none; }
+
+    
+        /* Hero Skin System */
+        .hero-avatar-box { width: 56px; height: 56px; margin: 0 auto 6px; display: flex; align-items: center; justify-content: center; }
+        .hero-avatar-box svg { width: 56px; height: 56px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+        .skin-selector-wrap { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.12); cursor: default; }
+        .skin-selector-title { font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; margin-bottom: 6px; }
+        .skin-thumbs-row { display: flex; gap: 6px; justify-content: center; align-items: center; margin-bottom: 8px; }
+        .skin-thumb { width: 38px; height: 38px; border-radius: 6px; background: #1e293b; border: 2px solid #475569; cursor: pointer; position: relative; display: flex; align-items: center; justify-content: center; padding: 2px; transition: all 0.15s ease; }
+        .skin-thumb:hover { border-color: #93c5fd; transform: translateY(-2px); }
+        .skin-thumb.selected { border-color: #facc15; box-shadow: 0 0 10px rgba(250, 204, 21, 0.5); background: #334155; }
+        .skin-thumb svg { width: 32px; height: 32px; pointer-events: none; }
+        .skin-thumb .skin-badge-dot { position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; border-radius: 50%; background: #22c55e; border: 1.5px solid #0f172a; }
+        .skin-thumb .skin-lock-icon { position: absolute; bottom: 1px; right: 1px; font-size: 9px; line-height: 1; filter: drop-shadow(0 1px 2px #000); }
+        .skin-info-card { background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 6px; display: flex; flex-direction: column; align-items: center; gap: 3px; min-height: 72px; justify-content: space-between; }
+        .skin-name-txt { font-size: 0.82rem; font-weight: bold; color: #facc15; }
+        .skin-desc-txt { font-size: 0.72rem; color: #94a3b8; line-height: 1.2; text-align: center; max-height: 28px; overflow: hidden; }
+        .skin-action-btn { width: 100%; border: none; border-radius: 4px; padding: 4px 6px; font-size: 0.75rem; font-weight: bold; cursor: pointer; transition: all 0.15s; }
+        .skin-btn-equip { background: #3b82f6; color: white; box-shadow: 0 2px 0 #1d4ed8; }
+        .skin-btn-equip:hover { background: #2563eb; }
+        .skin-btn-unlock { background: #eab308; color: black; box-shadow: 0 2px 0 #ca8a04; }
+        .skin-btn-unlock:hover { background: #facc15; }
+        .skin-badge-equipped { background: rgba(34, 197, 94, 0.25); border: 1px solid #22c55e; color: #4ade80; border-radius: 4px; padding: 3px 8px; font-size: 0.72rem; font-weight: bold; }
+
+    </style>
+</head>
+<body>
+
+    <!-- Hero SVG Sprite System (viewBox 0 0 48 48, centered at 24, 26, facing right) -->
+    <svg id="hero-svg-sprites" xmlns="http://www.w3.org/2000/svg" style="display:none;" aria-hidden="true">
+      <defs>
+        <!-- Gradients -->
+        <linearGradient id="heroSkin" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fde047"/><stop offset="100%" stop-color="#eab308"/></linearGradient>
+        <linearGradient id="goldGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fef08a"/><stop offset="50%" stop-color="#f59e0b"/><stop offset="100%" stop-color="#b45309"/></linearGradient>
+        
+        <!-- Archer Gradients -->
+        <linearGradient id="arcCloak" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#22c55e"/><stop offset="100%" stop-color="#14532d"/></linearGradient>
+        <linearGradient id="arcHood" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#16a34a"/><stop offset="100%" stop-color="#0f391f"/></linearGradient>
+        <linearGradient id="arcBow" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#d97706"/><stop offset="100%" stop-color="#78350f"/></linearGradient>
+        <linearGradient id="arcQuiver" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#92400e"/><stop offset="100%" stop-color="#451a03"/></linearGradient>
+        
+        <!-- Archer Shadow Gradients -->
+        <linearGradient id="shadowCloak" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6b21a8"/><stop offset="100%" stop-color="#2e1065"/></linearGradient>
+        <linearGradient id="shadowHood" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4c1d95"/><stop offset="100%" stop-color="#1e1b4b"/></linearGradient>
+        <linearGradient id="shadowBow" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a855f7"/><stop offset="100%" stop-color="#3b0764"/></linearGradient>
+        
+        <!-- Archer Celestial Gradients -->
+        <linearGradient id="solarCloak" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ffffff"/><stop offset="100%" stop-color="#cbd5e1"/></linearGradient>
+        <linearGradient id="solarBow" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fef08a"/><stop offset="100%" stop-color="#ca8a04"/></linearGradient>
+        
+        <!-- Paladin Gradients -->
+        <linearGradient id="palSteel" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f8fafc"/><stop offset="60%" stop-color="#94a3b8"/><stop offset="100%" stop-color="#475569"/></linearGradient>
+        <linearGradient id="palGreaves" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#cbd5e1"/><stop offset="100%" stop-color="#334155"/></linearGradient>
+        <linearGradient id="palShield" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2563eb"/><stop offset="100%" stop-color="#1e3a8a"/></linearGradient>
+        <linearGradient id="palGold" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fef08a"/><stop offset="100%" stop-color="#b45309"/></linearGradient>
+        <linearGradient id="palPlume" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ef4444"/><stop offset="100%" stop-color="#991b1b"/></linearGradient>
+        
+        <!-- Paladin Crusader Gradients -->
+        <linearGradient id="crusaderArmor" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fef08a"/><stop offset="50%" stop-color="#eab308"/><stop offset="100%" stop-color="#854d0e"/></linearGradient>
+        <linearGradient id="crusaderShield" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#dc2626"/><stop offset="100%" stop-color="#7f1d1d"/></linearGradient>
+        <linearGradient id="crusaderHammer" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fef08a"/><stop offset="50%" stop-color="#ea580c"/><stop offset="100%" stop-color="#9a3412"/></linearGradient>
+        
+        <!-- Paladin Dread Gradients -->
+        <linearGradient id="dreadArmor" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#475569"/><stop offset="100%" stop-color="#0f172a"/></linearGradient>
+        <linearGradient id="dreadShield" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0284c7"/><stop offset="100%" stop-color="#082f49"/></linearGradient>
+
+        <!-- Dragon Gradients -->
+        <linearGradient id="dragRed" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ef4444"/><stop offset="100%" stop-color="#991b1b"/></linearGradient>
+        <linearGradient id="dragBelly" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fef08a"/><stop offset="100%" stop-color="#eab308"/></linearGradient>
+        <linearGradient id="dragWing" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#b91c1c"/><stop offset="100%" stop-color="#450a0a"/></linearGradient>
+        <linearGradient id="dragHorn" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fde047"/><stop offset="100%" stop-color="#92400e"/></linearGradient>
+        
+        <!-- Dragon Frost Gradients -->
+        <linearGradient id="dragFrost" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#38bdf8"/><stop offset="100%" stop-color="#0369a1"/></linearGradient>
+        <linearGradient id="dragFrostBelly" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e0f2fe"/><stop offset="100%" stop-color="#7dd3fc"/></linearGradient>
+        <linearGradient id="dragFrostWing" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0284c7"/><stop offset="100%" stop-color="#082f49"/></linearGradient>
+        <linearGradient id="dragFrostHorn" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#bae6fd"/><stop offset="100%" stop-color="#0284c7"/></linearGradient>
+
+        <!-- Dragon Astral Gradients -->
+        <linearGradient id="dragAstral" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#818cf8"/><stop offset="100%" stop-color="#312e81"/></linearGradient>
+        <linearGradient id="dragAstralBelly" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fbcfe8"/><stop offset="100%" stop-color="#db2777"/></linearGradient>
+        <linearGradient id="dragAstralWing" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4f46e5"/><stop offset="100%" stop-color="#1e1b4b"/></linearGradient>
+        <linearGradient id="dragAstralHorn" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fef08a"/><stop offset="100%" stop-color="#b45309"/></linearGradient>
+      </defs>
+
+      <!-- ARCHER SKINS (viewBox 0 0 48 48, hero centered at 24, 26, facing right) -->
+      <symbol id="hero-archer-default" viewBox="0 0 48 48">
+        <path d="M 16,24 Q 12,32 10,38 L 19,38 Q 20,30 20,24 Z" fill="url(#arcCloak)" stroke="#0f172a" stroke-width="1.5" stroke-linejoin="round"/>
+        <rect x="13" y="19" width="5" height="13" rx="1.5" transform="rotate(-15 15.5 25.5)" fill="url(#arcQuiver)" stroke="#0f172a" stroke-width="1.5"/>
+        <line x1="12" y1="18" x2="10" y2="12" stroke="#e2e8f0" stroke-width="1.5"/>
+        <polygon points="8,13 11,11 12,14" fill="#ef4444"/>
+        <rect x="19" y="32" width="4" height="8" rx="1" fill="#475569" stroke="#0f172a" stroke-width="1.5"/>
+        <rect x="24" y="32" width="4" height="8" rx="1" fill="#334155" stroke="#0f172a" stroke-width="1.5"/>
+        <path d="M 17,23 L 29,23 L 28,33 L 18,33 Z" fill="url(#arcCloak)" stroke="#0f172a" stroke-width="1.5" stroke-linejoin="round"/>
+        <rect x="17" y="29" width="12" height="3" fill="#78350f" stroke="#0f172a" stroke-width="1"/>
+        <rect x="22" y="28.5" width="3" height="4" fill="#fbbf24" stroke="#0f172a" stroke-width="1"/>
+        <circle cx="23" cy="18" r="6" fill="url(#heroSkin)" stroke="#0f172a" stroke-width="1.5"/>
+        <path d="M 16,18 Q 17,11 23,11 Q 29,11 29,18 L 27,21 Q 22,23 17,21 Z" fill="url(#arcHood)" stroke="#0f172a" stroke-width="1.5" stroke-linejoin="round"/>
+        <circle cx="26" cy="17.5" r="1.2" fill="#0f172a"/>
+        <path d="M 33,12 Q 39,26 33,40" fill="none" stroke="url(#arcBow)" stroke-width="3" stroke-linecap="round"/>
+        <line x1="33" y1="12" x2="33" y2="40" stroke="#f8fafc" stroke-width="1"/>
+        <line x1="22" y1="26" x2="37" y2="26" stroke="#ca8a04" stroke-width="1.8"/>
+        <polygon points="41,26 36,23.5 37,26 36,28.5" fill="#f1f5f9" stroke="#0f172a" stroke-width="1"/>
+        <polygon points="21,26 18,24 19,26 18,28" fill="#22c55e"/>
+        <circle cx="29" cy="26" r="2.2" fill="url(#heroSkin)" stroke="#0f172a" stroke-width="1"/>
+      </symbol>
+
+      <symbol id="hero-archer-shadow" viewBox="0 0 48 48">
+        <path d="M 16,24 Q 11,32 8,39 L 19,38 Q 20,30 20,24 Z" fill="url(#shadowCloak)" stroke="#090514" stroke-width="1.5" stroke-linejoin="round"/>
+        <rect x="13" y="19" width="5" height="13" rx="1.5" transform="rotate(-15 15.5 25.5)" fill="#1e1b4b" stroke="#090514" stroke-width="1.5"/>
+        <line x1="12" y1="18" x2="10" y2="12" stroke="#c084fc" stroke-width="1.5"/>
+        <polygon points="8,13 11,11 12,14" fill="#a855f7"/>
+        <rect x="19" y="32" width="4" height="8" rx="1" fill="#1e1b4b" stroke="#090514" stroke-width="1.5"/>
+        <rect x="24" y="32" width="4" height="8" rx="1" fill="#0f172a" stroke="#090514" stroke-width="1.5"/>
+        <path d="M 17,23 L 29,23 L 28,33 L 18,33 Z" fill="url(#shadowCloak)" stroke="#090514" stroke-width="1.5" stroke-linejoin="round"/>
+        <rect x="17" y="29" width="12" height="3" fill="#3b0764" stroke="#090514" stroke-width="1"/>
+        <rect x="22" y="28.5" width="3" height="4" fill="#a855f7" stroke="#090514" stroke-width="1"/>
+        <circle cx="23" cy="18" r="6" fill="url(#heroSkin)" stroke="#090514" stroke-width="1.5"/>
+        <path d="M 16,18 Q 17,11 23,11 Q 29,11 29,18 L 27,21 Q 22,23 17,21 Z" fill="url(#shadowHood)" stroke="#090514" stroke-width="1.5" stroke-linejoin="round"/>
+        <circle cx="26" cy="17.5" r="1.5" fill="#f0abfc"/>
+        <circle cx="26.3" cy="17.5" r="0.7" fill="#ffffff"/>
+        <path d="M 33,12 Q 40,26 33,40" fill="none" stroke="url(#shadowBow)" stroke-width="3" stroke-linecap="round"/>
+        <line x1="33" y1="12" x2="33" y2="40" stroke="#e879f9" stroke-width="1.2"/>
+        <line x1="22" y1="26" x2="38" y2="26" stroke="#c084fc" stroke-width="2"/>
+        <polygon points="42,26 36,23.5 37,26 36,28.5" fill="#e879f9" stroke="#090514" stroke-width="1"/>
+        <circle cx="29" cy="26" r="2.2" fill="#581c87" stroke="#090514" stroke-width="1"/>
+      </symbol>
+
+      <symbol id="hero-archer-celestial" viewBox="0 0 48 48">
+        <path d="M 16,24 Q 12,32 10,38 L 19,38 Q 20,30 20,24 Z" fill="url(#solarCloak)" stroke="#0f172a" stroke-width="1.5" stroke-linejoin="round"/>
+        <rect x="13" y="19" width="5" height="13" rx="1.5" transform="rotate(-15 15.5 25.5)" fill="url(#goldGrad)" stroke="#0f172a" stroke-width="1.5"/>
+        <line x1="12" y1="18" x2="10" y2="12" stroke="#fde047" stroke-width="1.5"/>
+        <polygon points="8,13 11,11 12,14" fill="#38bdf8"/>
+        <rect x="19" y="32" width="4" height="8" rx="1" fill="#e2e8f0" stroke="#0f172a" stroke-width="1.5"/>
+        <rect x="24" y="32" width="4" height="8" rx="1" fill="#cbd5e1" stroke="#0f172a" stroke-width="1.5"/>
+        <path d="M 17,23 L 29,23 L 28,33 L 18,33 Z" fill="url(#solarCloak)" stroke="#0f172a" stroke-width="1.5" stroke-linejoin="round"/>
+        <rect x="17" y="29" width="12" height="3" fill="url(#goldGrad)" stroke="#0f172a" stroke-width="1"/>
+        <circle cx="23" cy="18" r="6" fill="url(#heroSkin)" stroke="#0f172a" stroke-width="1.5"/>
+        <path d="M 16,18 Q 17,10 23,9 Q 29,10 29,18 L 27,21 Q 22,23 17,21 Z" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M 18,12 L 23,8 L 28,12" fill="none" stroke="url(#goldGrad)" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="26" cy="17.5" r="1.3" fill="#0284c7"/>
+        <path d="M 33,12 Q 39,26 33,40" fill="none" stroke="url(#solarBow)" stroke-width="3.5" stroke-linecap="round"/>
+        <line x1="33" y1="12" x2="33" y2="40" stroke="#ffffff" stroke-width="1.2"/>
+        <line x1="22" y1="26" x2="38" y2="26" stroke="#fde047" stroke-width="2"/>
+        <polygon points="42,26 36,23 37,26 36,29" fill="#ffffff" stroke="#ca8a04" stroke-width="1"/>
+        <circle cx="29" cy="26" r="2.2" fill="url(#goldGrad)" stroke="#0f172a" stroke-width="1"/>
+      </symbol>
+
+      <!-- PALADIN SKINS (viewBox 0 0 48 48, hero centered at 24, 26, facing right) -->
+      <symbol id="hero-paladin-default" viewBox="0 0 48 48">
+        <rect x="17" y="34" width="5" height="8" rx="1.5" fill="url(#palGreaves)" stroke="#0f172a" stroke-width="1.5"/>
+        <rect x="24" y="34" width="5" height="8" rx="1.5" fill="url(#palGreaves)" stroke="#0f172a" stroke-width="1.5"/>
+        <path d="M 16,21 L 29,21 L 28,34 L 17,34 Z" fill="url(#palSteel)" stroke="#0f172a" stroke-width="1.5"/>
+        <rect x="16" y="29" width="13" height="4" fill="url(#palGold)" stroke="#0f172a" stroke-width="1"/>
+        <ellipse cx="20" cy="21" rx="4.5" ry="3.5" fill="url(#palGold)" stroke="#0f172a" stroke-width="1.5"/>
+        <circle cx="23" cy="15" r="6.5" fill="url(#palSteel)" stroke="#0f172a" stroke-width="1.5"/>
+        <rect x="22" y="13.5" width="7" height="3" rx="1" fill="#0f172a"/>
+        <line x1="23" y1="15" x2="28" y2="15" stroke="#fef08a" stroke-width="1"/>
+        <path d="M 19,9 Q 13,6 9,9 Q 11,13 16,12 Z" fill="url(#palPlume)" stroke="#0f172a" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M 12,20 L 19,20 L 19,30 L 15.5,35 L 12,30 Z" fill="url(#palShield)" stroke="#0f172a" stroke-width="1.5"/>
+        <line x1="15.5" y1="22" x2="15.5" y2="33" stroke="url(#palGold)" stroke-width="1.5"/>
+        <line x1="13.5" y1="25" x2="17.5" y2="25" stroke="url(#palGold)" stroke-width="1.5"/>
+        <line x1="26" y1="32" x2="36" y2="17" stroke="#78350f" stroke-width="2.5" stroke-linecap="round"/>
+        <g transform="translate(36, 17) rotate(-35)">
+          <rect x="-5" y="-5" width="10" height="7" rx="1.5" fill="url(#palSteel)" stroke="#0f172a" stroke-width="1.5"/>
+          <rect x="-2" y="-4" width="4" height="5" fill="url(#palGold)"/>
+        </g>
+      </symbol>
+
+      <symbol id="hero-paladin-crusader" viewBox="0 0 48 48">
+        <rect x="17" y="34" width="5" height="8" rx="1.5" fill="url(#crusaderArmor)" stroke="#0f172a" stroke-width="1.5"/>
+        <rect x="24" y="34" width="5" height="8" rx="1.5" fill="url(#crusaderArmor)" stroke="#0f172a" stroke-width="1.5"/>
+        <path d="M 16,21 L 29,21 L 28,34 L 17,34 Z" fill="url(#crusaderArmor)" stroke="#0f172a" stroke-width="1.5"/>
+        <rect x="16" y="29" width="13" height="4" fill="#991b1b" stroke="#0f172a" stroke-width="1"/>
+        <ellipse cx="20" cy="21" rx="5" ry="4" fill="#dc2626" stroke="#0f172a" stroke-width="1.5"/>
+        <circle cx="23" cy="15" r="6.5" fill="url(#crusaderArmor)" stroke="#0f172a" stroke-width="1.5"/>
+        <rect x="22" y="13.5" width="7" height="3" rx="1" fill="#7f1d1d"/>
+        <line x1="23" y1="15" x2="28" y2="15" stroke="#fef08a" stroke-width="1.2"/>
+        <path d="M 19,9 Q 13,5 8,8 Q 11,13 16,12 Z" fill="#f59e0b" stroke="#0f172a" stroke-width="1.5"/>
+        <circle cx="15.5" cy="27" r="7.5" fill="url(#crusaderShield)" stroke="#0f172a" stroke-width="1.5"/>
+        <circle cx="15.5" cy="27" r="3.5" fill="url(#goldGrad)" stroke="#0f172a" stroke-width="1"/>
+        <line x1="26" y1="32" x2="36" y2="17" stroke="#b45309" stroke-width="2.5" stroke-linecap="round"/>
+        <g transform="translate(36, 17) rotate(-35)">
+          <rect x="-6" y="-6" width="12" height="8" rx="1.5" fill="url(#crusaderHammer)" stroke="#0f172a" stroke-width="1.5"/>
+          <circle cx="0" cy="-2" r="2" fill="#fef08a"/>
+        </g>
+      </symbol>
+
+      <symbol id="hero-paladin-dread" viewBox="0 0 48 48">
+        <rect x="17" y="34" width="5" height="8" rx="1.5" fill="url(#dreadArmor)" stroke="#0f172a" stroke-width="1.5"/>
+        <rect x="24" y="34" width="5" height="8" rx="1.5" fill="url(#dreadArmor)" stroke="#0f172a" stroke-width="1.5"/>
+        <path d="M 16,21 L 29,21 L 28,34 L 17,34 Z" fill="url(#dreadArmor)" stroke="#0f172a" stroke-width="1.5"/>
+        <rect x="16" y="29" width="13" height="4" fill="#0284c7" stroke="#0f172a" stroke-width="1"/>
+        <ellipse cx="20" cy="21" rx="5" ry="4" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5"/>
+        <circle cx="23" cy="15" r="6.5" fill="url(#dreadArmor)" stroke="#0f172a" stroke-width="1.5"/>
+        <rect x="22" y="13.5" width="7" height="3" rx="1" fill="#0f172a"/>
+        <line x1="23" y1="15" x2="28" y2="15" stroke="#38bdf8" stroke-width="1.5"/>
+        <path d="M 19,9 L 14,4 L 17,10 Z" fill="#38bdf8" stroke="#0f172a" stroke-width="1"/>
+        <path d="M 12,20 L 19,20 L 19,29 L 15.5,35 L 12,29 Z" fill="url(#dreadShield)" stroke="#0f172a" stroke-width="1.5"/>
+        <polygon points="15.5,23 17.5,27 13.5,27" fill="#38bdf8"/>
+        <line x1="26" y1="32" x2="36" y2="17" stroke="#1e293b" stroke-width="2.5" stroke-linecap="round"/>
+        <g transform="translate(36, 17) rotate(-35)">
+          <polygon points="-6,-6 6,-6 8,0 6,4 -6,4 -8,0" fill="url(#dreadArmor)" stroke="#38bdf8" stroke-width="1.5"/>
+        </g>
+      </symbol>
+
+      <!-- DRAGON SKINS (viewBox 0 0 48 48, hero centered at 24, 26, facing right) -->
+      <symbol id="hero-dragon-default" viewBox="0 0 48 48">
+        <path d="M 16,28 Q 9,31 4,25 Q 7,22 12,25 Q 16,26 18,27 Z" fill="url(#dragRed)" stroke="#0f172a" stroke-width="1.5"/>
+        <polygon points="4,25 1,23 2,27" fill="#f59e0b" stroke="#0f172a" stroke-width="1"/>
+        <path d="M 19,22 Q 13,8 9,11 Q 7,15 11,20 Q 14,23 18,24 Z" fill="url(#dragWing)" stroke="#0f172a" stroke-width="1.5" stroke-linejoin="round"/>
+        <line x1="19" y1="22" x2="9" y2="11" stroke="url(#dragRed)" stroke-width="2.5"/>
+        <ellipse cx="23" cy="27" rx="9" ry="7" fill="url(#dragRed)" stroke="#0f172a" stroke-width="1.5"/>
+        <path d="M 19,26 Q 24,31 29,26 L 28,30 Q 23,34 18,29 Z" fill="url(#dragBelly)" stroke="#0f172a" stroke-width="1"/>
+        <path d="M 21,30 L 20,38 L 24,38" fill="none" stroke="url(#dragRed)" stroke-width="3" stroke-linecap="round"/>
+        <line x1="20" y1="38" x2="24" y2="38" stroke="#fef08a" stroke-width="1.5"/>
+        <path d="M 27,24 Q 31,21 34,20 L 39,22 L 35,26 L 28,27 Z" fill="url(#dragRed)" stroke="#0f172a" stroke-width="1.5" stroke-linejoin="round"/>
+        <circle cx="34" cy="21" r="1.5" fill="#fef08a"/>
+        <circle cx="34.3" cy="21" r="0.8" fill="#0f172a"/>
+        <path d="M 31,19 Q 25,12 21,14 Q 24,17 29,19 Z" fill="url(#dragHorn)" stroke="#0f172a" stroke-width="1.5" stroke-linejoin="round"/>
+        <polygon points="39,22 43,21 41,24" fill="#f97316"/>
+      </symbol>
+
+      <symbol id="hero-dragon-frost" viewBox="0 0 48 48">
+        <path d="M 16,28 Q 9,31 4,25 Q 7,22 12,25 Q 16,26 18,27 Z" fill="url(#dragFrost)" stroke="#082f49" stroke-width="1.5"/>
+        <polygon points="4,25 1,23 2,27" fill="#bae6fd" stroke="#082f49" stroke-width="1"/>
+        <path d="M 19,22 Q 13,8 9,11 Q 7,15 11,20 Q 14,23 18,24 Z" fill="url(#dragFrostWing)" stroke="#082f49" stroke-width="1.5" stroke-linejoin="round"/>
+        <line x1="19" y1="22" x2="9" y2="11" stroke="url(#dragFrost)" stroke-width="2.5"/>
+        <ellipse cx="23" cy="27" rx="9" ry="7" fill="url(#dragFrost)" stroke="#082f49" stroke-width="1.5"/>
+        <path d="M 19,26 Q 24,31 29,26 L 28,30 Q 23,34 18,29 Z" fill="url(#dragFrostBelly)" stroke="#082f49" stroke-width="1"/>
+        <path d="M 21,30 L 20,38 L 24,38" fill="none" stroke="url(#dragFrost)" stroke-width="3" stroke-linecap="round"/>
+        <line x1="20" y1="38" x2="24" y2="38" stroke="#ffffff" stroke-width="1.5"/>
+        <path d="M 27,24 Q 31,21 34,20 L 39,22 L 35,26 L 28,27 Z" fill="url(#dragFrost)" stroke="#082f49" stroke-width="1.5" stroke-linejoin="round"/>
+        <circle cx="34" cy="21" r="1.5" fill="#ffffff"/>
+        <circle cx="34.3" cy="21" r="0.8" fill="#0369a1"/>
+        <path d="M 31,19 Q 25,12 21,14 Q 24,17 29,19 Z" fill="url(#dragFrostHorn)" stroke="#082f49" stroke-width="1.5" stroke-linejoin="round"/>
+        <polygon points="39,22 43,21 41,24" fill="#38bdf8"/>
+      </symbol>
+
+      <symbol id="hero-dragon-celestial" viewBox="0 0 48 48">
+        <path d="M 16,28 Q 9,31 4,25 Q 7,22 12,25 Q 16,26 18,27 Z" fill="url(#dragAstral)" stroke="#1e1b4b" stroke-width="1.5"/>
+        <polygon points="4,25 1,23 2,27" fill="#fde047" stroke="#1e1b4b" stroke-width="1"/>
+        <path d="M 19,22 Q 13,8 9,11 Q 7,15 11,20 Q 14,23 18,24 Z" fill="url(#dragAstralWing)" stroke="#1e1b4b" stroke-width="1.5" stroke-linejoin="round"/>
+        <line x1="19" y1="22" x2="9" y2="11" stroke="url(#dragAstral)" stroke-width="2.5"/>
+        <ellipse cx="23" cy="27" rx="9" ry="7" fill="url(#dragAstral)" stroke="#1e1b4b" stroke-width="1.5"/>
+        <path d="M 19,26 Q 24,31 29,26 L 28,30 Q 23,34 18,29 Z" fill="url(#dragAstralBelly)" stroke="#1e1b4b" stroke-width="1"/>
+        <path d="M 21,30 L 20,38 L 24,38" fill="none" stroke="url(#dragAstral)" stroke-width="3" stroke-linecap="round"/>
+        <line x1="20" y1="38" x2="24" y2="38" stroke="#fde047" stroke-width="1.5"/>
+        <path d="M 27,24 Q 31,21 34,20 L 39,22 L 35,26 L 28,27 Z" fill="url(#dragAstral)" stroke="#1e1b4b" stroke-width="1.5" stroke-linejoin="round"/>
+        <circle cx="34" cy="21" r="1.5" fill="#fef08a"/>
+        <circle cx="34.3" cy="21" r="0.8" fill="#4338ca"/>
+        <path d="M 31,19 Q 25,12 21,14 Q 24,17 29,19 Z" fill="url(#dragAstralHorn)" stroke="#1e1b4b" stroke-width="1.5" stroke-linejoin="round"/>
+        <polygon points="39,22 43,21 41,24" fill="#ec4899"/>
+      </symbol>
+    </svg>
+
+    <div id="game-wrapper">
+        <div id="battlefield" style="position:relative; width:100%; aspect-ratio:4/3; display:flex; justify-content:center; align-items:center; background:#1a1a1a;">
+            <canvas id="gameCanvas" width="1024" height="768"></canvas>
+            <!-- Main Menu -->
+        <div id="ui-main-menu" class="screen pointer-events-auto">
+            <div class="meta-bar">
+                <div class="meta-btn">🟡 <span id="meta-gold-display">0</span></div>
+                <div class="meta-btn">💎 <span id="meta-gems-display">0</span></div>
+                <button class="meta-btn" onclick="openHeroHall()" style="background:#3b82f6;border-color:#2563eb;box-shadow:0 4px 0 #1d4ed8;">🛡️ HERO HALL</button>
+                <button class="meta-btn" onclick="openArmory()" style="background:#8b5cf6;border-color:#7c3aed;box-shadow:0 4px 0 #5b21b6;">🏪 ARMORY</button>
+            </div>
+            <h1>KINGDOM<br>DEFENSE</h1>
+            <div class="title-sub">ENDLESS VECTOR</div>
+            <button onclick="startGame({ defaultMap: true, resume: false })">▶️ START ENDLESS (DEFAULT)</button>
+            <button onclick="startGame({ defaultMap: true, resume: true })" class="btn-yellow">🔄 RESUME FROM WAVE <span id="resume-wave-display">1</span></button>
+            <button onclick="startGame({ mode: 'ROGUELIKE' })" class="btn-red" style="background:#b91c1c;">🔥 START ROGUELIKE EXPEDITION</button>
+            <button onclick="openEditor()" class="btn-green">🛠️ CUSTOM MAP EDITOR</button>
+            <button id="btn-sound" onclick="toggleSound()" style="background:#4b5563;box-shadow:0 6px 0 #374151;">🔊 SOUND: ON</button>
+            <div class="hud-stat" style="margin-top:20px; font-size: 1.2rem; padding: 10px 20px;">
+                🏆 Highest Wave: <span id="high-score-display" style="color:var(--a); font-weight:bold; font-size:1.5rem; margin-left:10px;">0</span>
+            </div>
+        </div>
+
+        <!-- Hero Hall Modal -->
+        <div id="ui-hero-hall" class="screen hidden pointer-events-none" style="background: rgba(0,0,0,0.7); z-index: 200;">
+            <div class="modal" style="max-width: 820px; width: 95%;">
+                <button class="close-btn" onclick="document.getElementById('ui-hero-hall').classList.add('hidden')">X</button>
+                <h2>🛡️ HERO HALL</h2>
+                <div class="hero-list">
+                    <div id="hero-archer" class="hero-card" onclick="onHeroCardClick('archer')">
+                        <div id="hero-archer-avatar" class="hero-avatar-box"></div>
+                        <h3>Archer</h3>
+                        <div style="color:#aaa; font-size:0.9rem;">Fast & Deadly</div>
+                        <div id="hero-archer-lvl" style="color:#facc15; font-weight:bold; margin-top:4px;">LVL 1</div>
+                        <div id="hero-archer-skins" class="skin-selector-wrap" onclick="event.stopPropagation()"></div>
+                    </div>
+                    <div id="hero-paladin" class="hero-card locked" onclick="onHeroCardClick('paladin')">
+                        <div id="hero-paladin-avatar" class="hero-avatar-box"></div>
+                        <h3>Paladin</h3>
+                        <div style="color:#aaa; font-size:0.9rem;">Tank & Heal</div>
+                        <div id="hero-paladin-btn" style="background:#eab308; color:black; padding:5px; border-radius:5px; margin-top:6px; font-weight:bold;">🔓 500 🟡</div>
+                        <div id="hero-paladin-lvl" class="hidden" style="color:#facc15; font-weight:bold; margin-top:4px;">LVL 1</div>
+                        <div id="hero-paladin-skins" class="skin-selector-wrap" onclick="event.stopPropagation()"></div>
+                    </div>
+                    <div id="hero-dragon" class="hero-card locked" onclick="onHeroCardClick('dragon')">
+                        <div id="hero-dragon-avatar" class="hero-avatar-box"></div>
+                        <h3>Dragon</h3>
+                        <div style="color:#aaa; font-size:0.9rem;">AoE Fire</div>
+                        <div id="hero-dragon-btn" style="background:#eab308; color:black; padding:5px; border-radius:5px; margin-top:6px; font-weight:bold;">🔓 20 💎</div>
+                        <div id="hero-dragon-lvl" class="hidden" style="color:#facc15; font-weight:bold; margin-top:4px;">LVL 1</div>
+                        <div id="hero-dragon-skins" class="skin-selector-wrap" onclick="event.stopPropagation()"></div>
+                    </div>
+                </div>
+                <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center; border-top: 2px solid #374151; padding-top: 15px;">
+                    <div>Active: <span id="hero-active-name" style="color:#facc15; font-weight:bold; font-size:1.2rem; text-transform: uppercase;">Archer</span> <span style="color:#aaa;">(LVL <span id="hero-active-lvl">1</span>)</span></div>
+                    <button onclick="upgradeHero()" id="btn-hero-upgrade" class="btn-yellow" style="font-size:1rem; padding:10px;">UPGRADE (<span id="hero-upgrade-cost">100</span> 🟡)</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Armory Modal -->
+        <div id="ui-armory" class="screen hidden pointer-events-none" style="background: rgba(0,0,0,0.7); z-index: 200;">
+            <div class="modal">
+                <button class="close-btn" onclick="document.getElementById('ui-armory').classList.add('hidden')">X</button>
+                <h2>🏪 GEM ARMORY</h2>
+                <div class="item-grid" id="armory-item-grid"></div>
+            </div>
+        </div>
+
+        
+        <!-- Editor HUD -->
+        <div id="ui-editor" class="screen hidden pointer-events-none">
+            <div class="editor-bar pointer-events-auto">
+                <button onclick="editorSetBrush(1, this)" class="brush-active">🛤️ Dirt Path</button>
+                <button onclick="editorSetBrush(2, this)">🏗️ Tower Slot</button>
+                <button onclick="editorSetBrush(3, this)">🔵 Spawn</button>
+                <button onclick="editorSetBrush(4, this)">🔴 Base</button>
+                <button onclick="editorSetBrush(0, this)">🧽 Eraser</button>
+                <div style="flex-basis: 100%; height: 0;"></div>
+                <button class="btn-green" onclick="saveAndPlayCustom()">💾 Save & Play</button>
+                <button class="btn-red" onclick="backToMenu()">❌ Cancel</button>
+            </div>
+        </div>
+        
+        <!-- Game HUD -->
+        <div id="ui-game" class="screen hidden pointer-events-auto" style="background:transparent; pointer-events:none;">
+            <div id="hud-bar" style="position: absolute; top:0; left:0; width:100%; background: rgba(0,0,0,0.8); color: white; padding: 10px 15px; display: flex; justify-content: space-between; z-index: 20; box-sizing: border-box; font-size: 18px;">
+                <div>❤️ <span id="hud-hp">20</span>/20 &nbsp; 💰 <span id="hud-gold">350</span> &nbsp; 💎 <span id="hud-meta-gems">0</span> &nbsp; <span id="wave-text">🌊 Wave <span id="hud-wave">1</span></span></div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button id="btn-extract-gold" onclick="extractGold()" style="background:#eab308; color:white; border:none; padding:4px 10px; border-radius:4px; cursor:pointer; font-weight:bold;">💰 EXTRACT (0/3000)</button>
+                    
+                    
+                    <button id="btn-auto-wave" onclick="toggleAuto()" style="padding: 4px 10px; border-radius:4px; border:none; cursor:pointer; font-weight:bold;">🤖 AUTO SWARM: OFF</button>
+                    <button id="btn-swarm" class="hidden" onclick="callSwarm()" style="background:#ef4444; color:white; border:none; padding:4px 10px; border-radius:4px; cursor:pointer; font-weight:bold;">🔥 SWARM NOW</button>
+                    <button id="btn-next-wave" onclick="startWave()" style="background:#22c55e; color:white; border:none; padding:4px 10px; border-radius:4px; cursor:pointer; font-weight:bold;">▶️ START WAVE</button>
+                    <div style="background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 4px; font-weight: bold; cursor: pointer;" onclick="toggleSpeed()">⏩ <span id="hud-speed">1x</span></div>
+                    <button onclick="togglePause()" style="background:none; border:none; color:white; font-size:22px; cursor:pointer;">⏸️</button>
+                    <button onclick="backToMenu()" style="background:#dc2626; color:white; border:none; padding:4px 10px; border-radius:4px; cursor:pointer; font-weight:bold;">EXIT</button>
+                </div>
+            </div>
+            <div id="element-display" class="element-banner hidden"></div>
+            
+            
+            <!-- Boss HP Overlay -->
+            <div id="boss-hp-container" class="hidden">
+                <div id="boss-name" style="text-align:center; color:#f87171; font-weight:bold; font-size:24px; text-shadow:0 2px 4px #000; margin-bottom:5px;">WAVE 10 BOSS</div>
+                <div style="width:100%; height:20px; background:#111; border:3px solid #444; border-radius:10px; overflow:hidden;">
+                    <div id="boss-hp-bar" style="width:100%; height:100%; background:linear-gradient(90deg, #dc2626, #f87171); transition:width 0.2s;"></div>
+                </div>
+            </div>
+            
+            <div id="ring-menu"></div>
+            <button id="btn-add-slot" onclick="toggleAddSlot()" style="position: absolute; bottom: 20px; left: 20px; z-index: 10; padding: 10px 20px; font-size: 16px; border-radius: 8px; border: none; background: #8b5cf6; color: white; cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3); display: none;">🏗️ ADD SLOT</button>
+            <div id="boon-container" class="boon-overlay hidden">
+                <h1 style="color: #facc15; text-shadow: 0 2px 4px rgba(0,0,0,0.5); font-size: 36px; margin: 0;">CHOOSE A BOON</h1>
+                <p style="color: #cbd5e1; font-size: 18px; margin-top: 10px;">End of wave rewards for your expedition.</p>
+                <div id="boon-cards" class="boon-cards"></div>
+            </div>
+        </div>
+        </div><!-- end battlefield -->
+        <div id="dashboard">
+            <div class="dashboard-left">
+                <div style="font-size: 48px; margin-bottom: 5px;" id="dash-hero-icon">🏹</div>
+                <div style="font-weight: bold; font-size: 18px; color: #facc15;" id="dash-hero-name">Archer</div>
+                <div style="font-size: 14px; color: #cbd5e1; margin-bottom: 10px;">Level <span id="dash-hero-lvl">1</span></div>
+                <div style="width: 100%; height: 8px; background: #0f172a; border-radius: 4px; overflow: hidden; margin-bottom: 10px;">
+                    <div id="dash-hero-xp" style="height: 100%; background: #3b82f6; width: 0%;"></div>
+                </div>
+            </div>
+            <div class="dashboard-tray" id="item-tray"></div>
+        </div>
+    </div>
+    <script>
+        // ==========================================
+        // 1. CONSTANTS & CONFIGURATION
+        // ==========================================
+        const TILE_SIZE = 64, COLS = 16, ROWS = 12;
+        const CANVAS_W = COLS * TILE_SIZE, CANVAS_H = ROWS * TILE_SIZE;
+        const CELL = { EMPTY: 0, PATH: 1, SLOT: 2, START: 3, END: 4 };
+        const TOWER = { ARCHER: 1, MAGE: 2, CANNON: 3, BARRACKS: 4 };
+        const ENEMY = { LIGHT: 1, HEAVY: 2, MAGIC: 3, FLYING: 4, BOSS: 5 };
+        
+        // Base Stats (Tier 1)
+        const TOWER_STATS = {
+            [TOWER.ARCHER]: { n: 'Archer', cost: 70, col: '#facc15', r: 160, cd: 30, dmg: 10, type: 'phys' },
+            [TOWER.MAGE]:   { n: 'Mage', cost: 100, col: '#a855f7', r: 180, cd: 60, dmg: 35, type: 'magic' },
+            [TOWER.CANNON]: { n: 'Cannon', cost: 130, col: '#9ca3af', r: 140, cd: 100, dmg: 45, type: 'aoe' },
+            [TOWER.BARRACKS]:{ n: 'Barracks', cost: 100, col: '#ea580c', r: 120, cd: 0, dmg: 0, type: 'barracks' }
+        };
+
+        // Branching Data (Tier 4)
+        const BRANCHES = {
+            [TOWER.ARCHER]: {
+                A: { n: 'Ranger', cost: 250, desc: 'Poison DOT (Dmg x1.5, Fast)', r: 220, cd: 20, dmg: 25, type: 'phys' },
+                B: { n: 'Musketeer', cost: 280, desc: 'Sniper (Dmg x6, Range+)', r: 250, cd: 80, dmg: 120, type: 'phys' }
+            },
+            [TOWER.MAGE]: {
+                A: { n: 'Death Ray', cost: 300, desc: 'Laser (Low Dmg, Ultra Fast)', r: 200, cd: 5, dmg: 2, type: 'magic' }, // Beam hits every 5 frames
+                B: { n: 'Necromancer', cost: 280, desc: 'Summon Skeletons (Block)', r: 180, cd: 50, dmg: 60, type: 'magic' }
+            },
+            [TOWER.CANNON]: {
+                A: { n: 'Missile', cost: 350, desc: 'Global Range, High CD', r: 2000, cd: 150, dmg: 150, type: 'aoe' },
+                B: { n: 'Tesla', cost: 320, desc: 'Stun Lightning (Dmg x1.5)', r: 160, cd: 70, dmg: 80, type: 'magic' }
+            },
+            [TOWER.BARRACKS]: {
+                A: { n: 'Paladin', cost: 250, desc: 'Heavy Armor (HP x5)', r: 120, type: 'barracks' },
+                B: { n: 'Barbarian', cost: 220, desc: 'High Dmg Throw (Dmg x6)', r: 120, type: 'barracks' }
+            }
+        };
+
+        const defaultMap = {
+            grid: [
+                [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                [0,0,0,0,2,0,0,2,0,0,0,0,0,0,0,0],
+                [3,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0],
+                [0,0,2,0,0,2,0,0,0,0,1,2,0,0,0,0],
+                [0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0],
+                [0,0,0,0,0,2,1,2,0,0,0,0,2,0,0,0],
+                [0,0,0,0,0,0,1,0,0,2,1,1,1,1,4,0],
+                [0,0,0,1,1,1,1,0,0,0,1,2,0,0,0,0],
+                [0,0,2,1,2,0,0,0,0,0,1,0,0,0,0,0],
+                [0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0],
+                [0,0,0,0,0,2,0,0,2,0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+            ]
+        };
+
+        // ==========================================
+        // 2. STORAGE & AUDIO
+        // ==========================================
+        const Store = {
+            save(k,v) { try { localStorage.setItem('krv_'+k, JSON.stringify(v)); } catch(e){} },
+            load(k) { try { let v = localStorage.getItem('krv_'+k); if(v) return JSON.parse(v); } catch(e){} return null; },
+            remove(k) { try { localStorage.removeItem('krv_'+k); } catch(e){} }
+        };
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let soundOn = Store.load('snd') !== false;
+
+        function sfx(type, pitchVar = 0.2) {
+            if(!soundOn) return;
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            let osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            let t = audioCtx.currentTime;
+            let p = 1 + (Math.random() - 0.5) * pitchVar;
+            
+            if(type === 'arrow') {
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(600*p, t); osc.frequency.exponentialRampToValueAtTime(800*p, t+0.05);
+                gain.gain.setValueAtTime(0.05, t); gain.gain.exponentialRampToValueAtTime(0.001, t+0.05);
+                osc.start(t); osc.stop(t+0.05);
+            } else if(type === 'gun') {
+                osc.type = 'square'; osc.frequency.setValueAtTime(150*p, t); osc.frequency.exponentialRampToValueAtTime(50*p, t+0.15);
+                gain.gain.setValueAtTime(0.2, t); gain.gain.exponentialRampToValueAtTime(0.001, t+0.15);
+                osc.start(t); osc.stop(t+0.15);
+            } else if(type === 'magic') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(400*p, t); osc.frequency.linearRampToValueAtTime(900*p, t+0.2);
+                gain.gain.setValueAtTime(0.08, t); gain.gain.linearRampToValueAtTime(0.001, t+0.2);
+                osc.start(t); osc.stop(t+0.2);
+            } else if(type === 'cannon') {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(100*p, t); osc.frequency.exponentialRampToValueAtTime(40*p, t+0.3);
+                gain.gain.setValueAtTime(0.3, t); gain.gain.exponentialRampToValueAtTime(0.001, t+0.3);
+                osc.start(t); osc.stop(t+0.3);
+            } else if(type === 'hit') {
+                osc.type = 'square'; osc.frequency.setValueAtTime(200*p, t); osc.frequency.exponentialRampToValueAtTime(100*p, t+0.1);
+                gain.gain.setValueAtTime(0.05, t); gain.gain.exponentialRampToValueAtTime(0.001, t+0.1);
+                osc.start(t); osc.stop(t+0.1);
+            } else if(type === 'coin') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(1200*p, t); osc.frequency.setValueAtTime(1600*p, t+0.05);
+                gain.gain.setValueAtTime(0.05, t); gain.gain.linearRampToValueAtTime(0, t+0.15);
+                osc.start(t); osc.stop(t+0.15);
+            } else if(type === 'tesla') {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(800*p, t); osc.frequency.linearRampToValueAtTime(200*p, t+0.2);
+                gain.gain.setValueAtTime(0.1, t); gain.gain.linearRampToValueAtTime(0.001, t+0.2);
+                osc.start(t); osc.stop(t+0.2);
+            }
+        }
+
+        function toggleSound() {
+            soundOn = !soundOn; Store.save('snd', soundOn);
+            document.getElementById('btn-sound').innerText = soundOn ? '🔊 SOUND: ON' : '🔇 SOUND: OFF';
+        }
+
+        // ==========================================
+        // 3. ENGINE STATE & GLOBALS
+        // ==========================================
+        let canvas, ctx, bgCanvas, bgCtx;
+        let state = 'MENU', map = null, waypoints = [];
+        let enemies = [], towers = [], projs = [], parts = [], texts = [], decals = [];
+        let gold = 300, hp = 20, wave = 1, frames = 0, speed = 1, paused = false, autoSwarm = false;
+
+        let gameMode = 'DEFAULT'; // 'DEFAULT', 'CUSTOM', 'ROGUELIKE'
+        let currentElement = null;
+        let rlInventory = Store.load('rlInventory') || { dynamite: 0, freeze: 0, heal: 0, thunder: 0, guards: 0, archers: 0, titan: 0, dragon: 0, warp: 0, nuke: 0 };
+        let itemPlacementMode = null;
+        let activeBoons = {};
+        
+        const ELEMENTS_DB = [
+            { id: 'Frost', col: '#3b82f6', n: 'Frost (Ice)', desc: '25% Slow Resist' },
+            { id: 'Fire', col: '#ef4444', n: 'Fire (Lava)', desc: 'Immune to burn, explodes on death' },
+            { id: 'Arcane', col: '#a855f7', n: 'Arcane (Magic)', desc: '50% Magic Resist, Fast' },
+            { id: 'Nature', col: '#22c55e', n: 'Nature (Thorns)', desc: 'Regens 2% HP/sec' },
+            { id: 'Earth', col: '#78350f', n: 'Earth (Stone)', desc: '60% Phys Armor, Slow' },
+            { id: 'Orc', col: '#166534', n: 'Orc Horde', desc: 'Balanced Stats' }
+        ];
+        
+        const BOONS_DB = [
+            { id: 'archer_speed', n: '箭术精通', desc: '所有射手塔攻击速度提升 25%' },
+            { id: 'mage_shatter', n: '奥术裂解', desc: '魔法塔命中敌人时额外粉碎其 20% 物理护甲，持续 4 秒' },
+            { id: 'cannon_crit', n: '高爆引信', desc: '火炮塔爆炸范围增加 35%，对中心目标造成 1.5 倍暴击' },
+            { id: 'barracks_buff', n: '钢铁壁垒', desc: '兵营士兵与拦截单位生命值提升 50%，复活时间减半' },
+            { id: 'midas_touch', n: '点金律法', desc: '击杀任何敌人额外获得 +2 局内金币' },
+            { id: 'hero_cd', n: '过载充能', desc: '英雄技能冷却时间缩短 30%' },
+            { id: 'global_frost', n: '全域冰霜', desc: '全场所有敌人的基础移动速度永久降低 15%' },
+            { id: 'lethal_snipe', n: '致命狙击', desc: '所有防御塔获得 5% 几率造成 3 倍真实伤害' },
+            { id: 'tactical_reserves', n: '战术储备', desc: '立即获得 500 局内金币与 1 颗宝石' },
+            { id: 'last_stand', n: '破釜沉舟', desc: '基地生命上限降为 1 点，但全场所有防御塔造成的伤害直接翻倍' }
+        ];
+        
+        const ITEMS_DB = {
+            dynamite: { n: '高爆裂地炸药', desc: '200范围1000伤害', gold: 1000, gem: 2, type: 'target', icon: '🧨' },
+            freeze: { n: '绝对零度冰霜', desc: '300范围冻结10秒', gold: 1500, gem: 3, type: 'target', icon: '❄️' },
+            heal: { n: '王室急救补给', desc: '基地恢复+10HP', gold: 500, gem: 1, type: 'instant', icon: '❤️' },
+            thunder: { n: '全屏雷霆风暴', desc: '全场雷击连锁伤害', gold: 1000, gem: 2, type: 'instant', icon: '⚡' },
+            guards: { n: '重装铁卫方阵', desc: '空降10名重兵阻挡', gold: 1000, gem: 2, type: 'target', icon: '🛡️' },
+            archers: { n: '精灵禁卫射手', desc: '部署10名高伤射手', gold: 1000, gem: 2, type: 'target', icon: '🏹' },
+            titan: { n: '泰坦远古巨人', desc: '1万血AOE巨石拦截', gold: 1500, gem: 2, type: 'target', icon: '🗿' },
+            dragon: { n: '苍穹风暴飞龙', desc: '天空巨龙喷吐压制', gold: 1500, gem: 2, type: 'target', icon: '🐉' },
+            warp: { n: '时空折跃门', desc: '将范围敌人传回起点', gold: 1000, gem: 2, type: 'target', icon: '🌀' },
+            nuke: { n: '战术氢弹打击', desc: '抹除场上所有生物', gold: 3000, gem: 4, type: 'instant', icon: '☢️' }
+        };
+
+        let screenShake = 0;
+        let selCell = null, rallyTower = null;
+        let availableSlots = 0, addSlotMode = false;
+        let metaGold = 0, metaGems = 0, extractedGold = 0;
+        let items = { dynamite: 0, freeze: 0, midas: 0 };
+        let heroes = { archer: { unlocked: true, level: 1, xp: 0 }, paladin: { unlocked: false, level: 1, xp: 0 }, dragon: { unlocked: false, level: 1, xp: 0 } };
+        let activeHero = 'archer';
+        let heroUnit = null;
+
+        // HERO SKINS SYSTEM
+        const HERO_SKINS = {
+            archer: [
+                {
+                    id: 'default',
+                    name: 'Forest Ranger',
+                    svgSymbolId: 'hero-archer-default',
+                    unlockCost: null,
+                    description: 'Swift sharpshooter of the Greenwood with rapid piercing shots.'
+                },
+                {
+                    id: 'shadow',
+                    name: 'Shadow Stalker',
+                    svgSymbolId: 'hero-archer-shadow',
+                    unlockCost: { gold: 400 },
+                    description: 'Veiled in dusk shadows with swift armor-piercing arrows.'
+                },
+                {
+                    id: 'celestial',
+                    name: 'Solar Warden',
+                    svgSymbolId: 'hero-archer-celestial',
+                    unlockCost: { gems: 15 },
+                    description: 'Radiant marksman firing blazing sunlit shafts.'
+                }
+            ],
+            paladin: [
+                {
+                    id: 'default',
+                    name: 'Holy Knight',
+                    svgSymbolId: 'hero-paladin-default',
+                    unlockCost: null,
+                    description: 'Steadfast defender of the realm in polished silver plate.'
+                },
+                {
+                    id: 'crusader',
+                    name: 'Sun Crusader',
+                    svgSymbolId: 'hero-paladin-crusader',
+                    unlockCost: { gold: 500 },
+                    description: 'Veteran champion wielding a consecrated golden warhammer.'
+                },
+                {
+                    id: 'dread',
+                    name: 'Dread Champion',
+                    svgSymbolId: 'hero-paladin-dread',
+                    unlockCost: { gems: 20 },
+                    description: 'Obsidian juggernaut empowered by ghostly soul-flames.'
+                }
+            ],
+            dragon: [
+                {
+                    id: 'default',
+                    name: 'Crimson Drake',
+                    svgSymbolId: 'hero-dragon-default',
+                    unlockCost: null,
+                    description: 'Apex volcanic terror raining apocalyptic dragonfire.'
+                },
+                {
+                    id: 'frost',
+                    name: 'Glacial Wyrm',
+                    svgSymbolId: 'hero-dragon-frost',
+                    unlockCost: { gold: 600 },
+                    description: 'Ancient frost drake breathing sub-zero glacial rime.'
+                },
+                {
+                    id: 'celestial',
+                    name: 'Astral Wyvern',
+                    svgSymbolId: 'hero-dragon-celestial',
+                    unlockCost: { gems: 25 },
+                    description: 'Mythical cosmic guardian summoned from the starry cosmos.'
+                }
+            ]
+        };
+
+        let equippedHeroSkins = { archer: 'default', paladin: 'default', dragon: 'default' };
+        let unlockedHeroSkins = { 'archer:default': true, 'paladin:default': true, 'dragon:default': true };
+        let previewHeroSkins = { archer: 'default', paladin: 'default', dragon: 'default' };
+        const HERO_SKIN_CANVASES = {};
+
+        function getSkinDef(heroType, skinId) {
+            let list = HERO_SKINS[heroType] || [];
+            return list.find(s => s.id === skinId) || list[0] || null;
+        }
+
+        function getEquippedHeroSkin(heroType) {
+            return (equippedHeroSkins && equippedHeroSkins[heroType]) || 'default';
+        }
+
+        function isSkinUnlocked(heroType, skinId) {
+            if (!skinId || skinId === 'default') return true;
+            let skin = getSkinDef(heroType, skinId);
+            if (!skin || !skin.unlockCost || (!skin.unlockCost.gold && !skin.unlockCost.gems)) return true;
+            return !!(unlockedHeroSkins && (unlockedHeroSkins[heroType + ':' + skinId] || unlockedHeroSkins[skinId]));
+        }
+
+        function rasterizeAllHeroSkins() {
+            let spritesEl = document.getElementById('hero-svg-sprites');
+            let defsEl = spritesEl ? spritesEl.querySelector('defs') : null;
+            let defsContent = defsEl ? defsEl.outerHTML : '';
+
+            for (let hero in HERO_SKINS) {
+                HERO_SKINS[hero].forEach(skin => {
+                    let sym = document.getElementById(skin.svgSymbolId);
+                    if (!sym) return;
+                    let offCanvas = document.createElement('canvas');
+                    offCanvas.width = 48;
+                    offCanvas.height = 48;
+                    let offCtx = offCanvas.getContext('2d');
+                    
+                    let svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">` +
+                        defsContent +
+                        `<g>${sym.innerHTML}</g>` +
+                        `</svg>`;
+                    
+                    let img = new Image();
+                    img.onload = () => {
+                        offCtx.clearRect(0, 0, 48, 48);
+                        offCtx.drawImage(img, 0, 0, 48, 48);
+                    };
+                    img.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(svgString);
+                    HERO_SKIN_CANVASES[skin.svgSymbolId] = offCanvas;
+                });
+            }
+        }
+
+        function getHeroSkinCanvas(heroType, skinId) {
+            let skinDef = getSkinDef(heroType, skinId) || getSkinDef(heroType, 'default');
+            if (!skinDef) return null;
+            if (HERO_SKIN_CANVASES[skinDef.svgSymbolId]) {
+                return HERO_SKIN_CANVASES[skinDef.svgSymbolId];
+            }
+            let sym = document.getElementById(skinDef.svgSymbolId);
+            if (sym) {
+                let offCanvas = document.createElement('canvas');
+                offCanvas.width = 48;
+                offCanvas.height = 48;
+                let offCtx = offCanvas.getContext('2d');
+                let spritesEl = document.getElementById('hero-svg-sprites');
+                let defsEl = spritesEl ? spritesEl.querySelector('defs') : null;
+                let defsContent = defsEl ? defsEl.outerHTML : '';
+                let svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">${defsContent}<g>${sym.innerHTML}</g></svg>`;
+                let img = new Image();
+                img.onload = () => {
+                    offCtx.clearRect(0, 0, 48, 48);
+                    offCtx.drawImage(img, 0, 0, 48, 48);
+                };
+                img.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(svgString);
+                HERO_SKIN_CANVASES[skinDef.svgSymbolId] = offCanvas;
+                return offCanvas;
+            }
+            return null;
+        }
+
+        function previewHeroSkin(heroType, skinId) {
+            previewHeroSkins[heroType] = skinId;
+            sfx('click');
+            renderHeroHallSkins();
+        }
+
+        function equipHeroSkin(heroType, skinId) {
+            if (!isSkinUnlocked(heroType, skinId)) return;
+            equippedHeroSkins[heroType] = skinId;
+            previewHeroSkins[heroType] = skinId;
+            if (heroUnit && heroUnit.type === heroType) {
+                heroUnit.skinId = skinId;
+            }
+            sfx('click');
+            saveMeta();
+            renderHeroHallSkins();
+        }
+
+        function unlockHeroSkin(heroType, skinId) {
+            let skin = getSkinDef(heroType, skinId);
+            if (!skin) return;
+            if (isSkinUnlocked(heroType, skinId)) return;
+
+            let cost = skin.unlockCost;
+            if (cost) {
+                if (cost.gold && metaGold < cost.gold) {
+                    alert('Not enough gold!');
+                    return;
+                }
+                if (cost.gems && metaGems < cost.gems) {
+                    alert('Not enough gems!');
+                    return;
+                }
+                if (cost.gold) metaGold -= cost.gold;
+                if (cost.gems) metaGems -= cost.gems;
+            }
+
+            unlockedHeroSkins[heroType + ':' + skinId] = true;
+            equippedHeroSkins[heroType] = skinId;
+            previewHeroSkins[heroType] = skinId;
+            if (heroUnit && heroUnit.type === heroType) {
+                heroUnit.skinId = skinId;
+            }
+            sfx('build');
+            saveMeta();
+            loadMeta();
+            renderHeroHallSkins();
+        }
+
+        function onHeroCardClick(h) {
+            if (heroes[h] && heroes[h].unlocked) {
+                selectHero(h);
+            } else {
+                buyHero(h);
+            }
+        }
+
+        function renderHeroHallSkins() {
+            ['archer', 'paladin', 'dragon'].forEach(h => {
+                let cardEl = document.getElementById('hero-' + h);
+                if (!cardEl) return;
+                
+                let skins = HERO_SKINS[h] || [];
+                let currentPreview = previewHeroSkins[h] || equippedHeroSkins[h] || 'default';
+                let previewDef = getSkinDef(h, currentPreview) || skins[0];
+                let isEquipped = (equippedHeroSkins[h] || 'default') === previewDef.id;
+                let unlocked = isSkinUnlocked(h, previewDef.id);
+                let heroUnlocked = heroes[h] && heroes[h].unlocked;
+
+                // Update hero card avatar with the previewed/equipped SVG art
+                let avatarEl = document.getElementById('hero-' + h + '-avatar');
+                if (avatarEl) {
+                    avatarEl.innerHTML = `<svg viewBox="0 0 48 48"><use href="#${previewDef.svgSymbolId}"></use></svg>`;
+                }
+
+                // Render thumbnails and skin details
+                let container = document.getElementById('hero-' + h + '-skins');
+                if (!container) return;
+
+                let thumbsHtml = skins.map(s => {
+                    let isSel = s.id === previewDef.id;
+                    let isEq = (equippedHeroSkins[h] || 'default') === s.id;
+                    let isUnl = isSkinUnlocked(h, s.id);
+                    return `
+                        <div class="skin-thumb ${isSel ? 'selected' : ''}" onclick="previewHeroSkin('${h}', '${s.id}')" title="${s.name}">
+                            <svg viewBox="0 0 48 48"><use href="#${s.svgSymbolId}"></use></svg>
+                            ${isEq ? '<span class="skin-badge-dot" title="Equipped"></span>' : ''}
+                            ${!isUnl ? '<span class="skin-lock-icon">🔒</span>' : ''}
+                        </div>
+                    `;
+                }).join('');
+
+                let actionBtnHtml = '';
+                if (!heroUnlocked) {
+                    actionBtnHtml = `<span style="font-size:0.75rem; color:#9ca3af; font-style:italic;">(Unlock Hero First)</span>`;
+                } else if (isEquipped) {
+                    actionBtnHtml = `<span class="skin-badge-equipped">✓ EQUIPPED</span>`;
+                } else if (unlocked) {
+                    actionBtnHtml = `<button class="skin-action-btn skin-btn-equip" onclick="equipHeroSkin('${h}', '${previewDef.id}')">EQUIP</button>`;
+                } else {
+                    let costText = previewDef.unlockCost.gems ? `${previewDef.unlockCost.gems} 💎` : `${previewDef.unlockCost.gold} 🟡`;
+                    actionBtnHtml = `<button class="skin-action-btn skin-btn-unlock" onclick="unlockHeroSkin('${h}', '${previewDef.id}')">UNLOCK (${costText})</button>`;
+                }
+
+                container.innerHTML = `
+                    <div class="skin-selector-title">Skins</div>
+                    <div class="skin-thumbs-row">${thumbsHtml}</div>
+                    <div class="skin-info-card">
+                        <div class="skin-name-txt">${previewDef.name}</div>
+                        <div class="skin-desc-txt">${previewDef.description}</div>
+                        <div style="width:100%; margin-top:3px;">${actionBtnHtml}</div>
+                    </div>
+                `;
+            });
+        }
+        let waveData = { on: false, t: 180, toSpawn: 0, spawnT: 0, spawned: 0, swarm: false, swarmT: 0 };
+        let resumedWave = null;
+        let scenery = [];
+
+        
+        
+        const createSVG = (w, h, content) => {
+            const img = new Image();
+            const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${content}</svg>`;
+            img.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(svgStr);
+            img.onload = () => { if(typeof renderTerrain === 'function' && bgCtx && map) renderTerrain(); };
+            return img;
+        };
+
+        const SVGS = {
+            goblin: createSVG(60, 60, `
+                <defs>
+                    <linearGradient id="gobSkin" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#84b846"/><stop offset="100%" stop-color="#4d6b28"/></linearGradient>
+                    <linearGradient id="gobHat" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#69463d"/><stop offset="100%" stop-color="#3b2722"/></linearGradient>
+                </defs>
+                <g transform="translate(30, 45)">
+                    <!-- Ears -->
+                    <path d="M-10,-20 L-22,-28 L-10,-10 Z" fill="url(#gobSkin)" stroke="#222" stroke-width="2" stroke-linejoin="round"/>
+                    <path d="M10,-20 L22,-28 L10,-10 Z" fill="url(#gobSkin)" stroke="#222" stroke-width="2" stroke-linejoin="round"/>
+                    <!-- Apron/Vest -->
+                    <rect x="-10" y="-12" width="20" height="15" fill="#5c4033" stroke="#222" stroke-width="2" rx="2"/>
+                    <rect x="-12" y="-2" width="24" height="4" fill="#3e2723" stroke="#222" stroke-width="2"/>
+                    <!-- Body/Head -->
+                    <circle cx="0" cy="-18" r="14" fill="url(#gobSkin)" stroke="#222" stroke-width="2"/>
+                    <!-- Eyes -->
+                    <circle cx="-5" cy="-20" r="2" fill="#222"/><circle cx="5" cy="-20" r="2" fill="#222"/>
+                    <!-- Hat -->
+                    <path d="M-15,-26 L0,-42 L15,-26 Z" fill="url(#gobHat)" stroke="#222" stroke-width="2" stroke-linejoin="round"/>
+                    <!-- Dagger -->
+                    <g transform="translate(15, -5)">
+                        <path d="M0,0 L20,-8 L0,8 Z" fill="#ccc" stroke="#222" stroke-width="1.5" stroke-linejoin="round"/>
+                        <rect x="-3" y="-3" width="6" height="12" fill="#4e342e" stroke="#222" stroke-width="1.5"/>
+                    </g>
+                </g>
+            `),
+            orc: createSVG(80, 80, `
+                <defs>
+                    <linearGradient id="orcSkin" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#627a2e"/><stop offset="100%" stop-color="#323f18"/></linearGradient>
+                    <linearGradient id="orcArmor" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6b7280"/><stop offset="100%" stop-color="#374151"/></linearGradient>
+                    <linearGradient id="orcHelm" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4b5563"/><stop offset="100%" stop-color="#1f2937"/></linearGradient>
+                </defs>
+                <g transform="translate(40, 60)">
+                    <!-- Body -->
+                    <circle cx="0" cy="-20" r="18" fill="url(#orcSkin)" stroke="#222" stroke-width="2.5"/>
+                    <!-- Armor -->
+                    <rect x="-18" y="-12" width="36" height="15" fill="url(#orcArmor)" stroke="#222" stroke-width="2.5" rx="3"/>
+                    <!-- Shield (Left hand, front) -->
+                    <g transform="translate(-15, -10)">
+                        <rect x="-6" y="-15" width="12" height="35" fill="#5c4033" stroke="#222" stroke-width="2" rx="2"/>
+                        <rect x="-8" y="-10" width="16" height="6" fill="#9ca3af" stroke="#222" stroke-width="2"/>
+                        <rect x="-8" y="10" width="16" height="6" fill="#9ca3af" stroke="#222" stroke-width="2"/>
+                    </g>
+                    <!-- Helmet -->
+                    <path d="M-18,-24 A18 18 0 0 1 18,-24 L18,-18 L-18,-18 Z" fill="url(#orcHelm)" stroke="#222" stroke-width="2.5"/>
+                    <!-- Horns -->
+                    <path d="M-12,-28 L-22,-45 L-5,-30 Z" fill="#d1d5db" stroke="#222" stroke-width="2" stroke-linejoin="round"/>
+                    <path d="M12,-28 L22,-45 L5,-30 Z" fill="#d1d5db" stroke="#222" stroke-width="2" stroke-linejoin="round"/>
+                    <!-- Eyes -->
+                    <circle cx="-6" cy="-14" r="2" fill="#ef4444"/><circle cx="6" cy="-14" r="2" fill="#ef4444"/>
+                    <!-- Hammer (Right hand) -->
+                    <g transform="translate(18, -10)">
+                        <rect x="-2" y="-20" width="6" height="30" fill="#4e342e" stroke="#222" stroke-width="2"/>
+                        <rect x="-12" y="-25" width="26" height="14" fill="url(#orcArmor)" stroke="#222" stroke-width="2.5" rx="2"/>
+                    </g>
+                </g>
+            `),
+            gargoyle: createSVG(80, 80, `
+                <defs>
+                    <linearGradient id="garSkin" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#55517a"/><stop offset="100%" stop-color="#2a283d"/></linearGradient>
+                    <linearGradient id="garWing" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3c395c"/><stop offset="100%" stop-color="#191826"/></linearGradient>
+                </defs>
+                <g transform="translate(40, 45)">
+                    <!-- Wings -->
+                    <path d="M-8,0 L-35,-25 L-20,15 Z" fill="url(#garWing)" stroke="#222" stroke-width="2" stroke-linejoin="round"/>
+                    <path d="M8,0 L35,-25 L20,15 Z" fill="url(#garWing)" stroke="#222" stroke-width="2" stroke-linejoin="round"/>
+                    <!-- Body -->
+                    <circle cx="0" cy="0" r="14" fill="url(#garSkin)" stroke="#222" stroke-width="2"/>
+                    <!-- Ears/Horns -->
+                    <path d="M-10,-10 L-20,-18 L-5,-13 Z" fill="url(#garSkin)" stroke="#222" stroke-width="2" stroke-linejoin="round"/>
+                    <path d="M10,-10 L20,-18 L5,-13 Z" fill="url(#garSkin)" stroke="#222" stroke-width="2" stroke-linejoin="round"/>
+                    <!-- Eye -->
+                    <circle cx="0" cy="-2" r="4" fill="#ef4444" stroke="#222" stroke-width="1.5"/>
+                    <circle cx="0" cy="-2" r="1.5" fill="#fff"/>
+                </g>
+            `),
+            necro: createSVG(70, 70, `
+                <defs>
+                    <linearGradient id="necCloak" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6b21a8"/><stop offset="100%" stop-color="#3b0764"/></linearGradient>
+                    <radialGradient id="necGlow" cx="0.5" cy="0.5" r="0.5"><stop offset="0%" stop-color="#10b981" stop-opacity="0.8"/><stop offset="100%" stop-color="#10b981" stop-opacity="0"/></radialGradient>
+                </defs>
+                <g transform="translate(35, 55)">
+                    <!-- Fog Base -->
+                    <ellipse cx="0" cy="5" rx="18" ry="8" fill="#111827" opacity="0.8"/>
+                    <!-- Cloak -->
+                    <path d="M-16,10 L0,-25 L16,10 Z" fill="url(#necCloak)" stroke="#222" stroke-width="2" stroke-linejoin="round"/>
+                    <!-- Hood -->
+                    <circle cx="0" cy="-12" r="10" fill="#000" stroke="#222" stroke-width="2"/>
+                    <!-- Eyes -->
+                    <circle cx="-4" cy="-12" r="2" fill="#3b82f6"/><circle cx="4" cy="-12" r="2" fill="#3b82f6"/>
+                    <!-- Staff -->
+                    <rect x="12" y="-20" width="4" height="35" fill="#4e342e" stroke="#222" stroke-width="1.5"/>
+                    <circle cx="14" cy="-22" r="10" fill="url(#necGlow)"/>
+                    <circle cx="14" cy="-22" r="5" fill="#10b981" stroke="#222" stroke-width="1"/>
+                </g>
+            `),
+            boss: createSVG(120, 120, `
+                <defs>
+                    <linearGradient id="bossRock" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4b5563"/><stop offset="100%" stop-color="#1f2937"/></linearGradient>
+                    <linearGradient id="bossLava" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fef08a"/><stop offset="50%" stop-color="#ef4444"/><stop offset="100%" stop-color="#7f1d1d"/></linearGradient>
+                </defs>
+                <g transform="translate(60, 90)">
+                    <!-- Core Body -->
+                    <circle cx="0" cy="-30" r="35" fill="url(#bossRock)" stroke="#222" stroke-width="3"/>
+                    <!-- Lava Cracks -->
+                    <path d="M-15,-40 L0,-25 L-10,-5 M10,-20 L25,0" stroke="url(#bossLava)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <!-- Shoulders -->
+                    <circle cx="-28" cy="-45" r="16" fill="url(#bossRock)" stroke="#222" stroke-width="3"/>
+                    <circle cx="28" cy="-45" r="16" fill="url(#bossRock)" stroke="#222" stroke-width="3"/>
+                    <!-- Chains -->
+                    <path d="M-28,-45 Q0,-10 28,-45" stroke="#9ca3af" stroke-width="5" stroke-dasharray="8 4" fill="none" stroke-linecap="round"/>
+                    <!-- Head -->
+                    <rect x="-10" y="-60" width="20" height="25" fill="#111827" stroke="#222" stroke-width="3" rx="4"/>
+                    <!-- Eye -->
+                    <rect x="-4" y="-52" width="8" height="6" fill="#fef08a" stroke="#ef4444" stroke-width="2"/>
+                </g>
+            `),
+            slot: createSVG(64, 64, `
+                <defs>
+                    <linearGradient id="slotBase" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6b7280"/><stop offset="100%" stop-color="#374151"/></linearGradient>
+                </defs>
+                <g transform="translate(32, 32)">
+                    <circle cx="0" cy="4" r="26" fill="#1f2937" opacity="0.4"/>
+                    <!-- Octagon base -->
+                    <polygon points="10,-24 24,-10 24,10 10,24 -10,24 -24,10 -24,-10 -10,-24" fill="#4a4e54" stroke="#222" stroke-width="2"/>
+                    <!-- Octagon top -->
+                    <polygon points="9,-22 22,-9 22,9 9,22 -9,22 -22,9 -22,-9 -9,-22" fill="url(#slotBase)" stroke="#9ca3af" stroke-width="1.5"/>
+                    <path d="M-8,-8 L8,8 M-8,8 L8,-8" stroke="rgba(218, 165, 32, 0.6)" stroke-width="3" stroke-linecap="round"/>
+                    <circle cx="0" cy="0" r="12" stroke="rgba(218, 165, 32, 0.6)" stroke-width="3" fill="none"/>
+                </g>
+            `),
+
+            start: createSVG(64, 64, `
+                <g transform="translate(32, 32)">
+                    <circle cx="0" cy="5" r="28" fill="#111" opacity="0.5"/>
+                    <circle cx="0" cy="0" r="26" fill="#1e3a8a" stroke="#222" stroke-width="2"/>
+                    <path d="M-15,-5 L0,15 L15,-5" stroke="#93c5fd" stroke-width="4" stroke-linecap="round" fill="none"/>
+                    <path d="M0,-15 L0,10" stroke="#93c5fd" stroke-width="4" stroke-linecap="round" fill="none"/>
+                </g>`),
+            end: createSVG(64, 64, `
+                <g transform="translate(32, 32)">
+                    <circle cx="0" cy="5" r="28" fill="#111" opacity="0.5"/>
+                    <circle cx="0" cy="0" r="26" fill="#7f1d1d" stroke="#222" stroke-width="2"/>
+                    <circle cx="0" cy="0" r="14" fill="#b91c1c" stroke="#fca5a5" stroke-width="3"/>
+                    <path d="M-8,-8 L8,8 M-8,8 L8,-8" stroke="#fca5a5" stroke-width="4" stroke-linecap="round"/>
+                </g>`),
+
+            soldier: createSVG(40, 40, `
+                <g transform="translate(20, 25)">
+                    <!-- Shield -->
+                    <path d="M-12,-10 L-4,-10 L-4,5 L-8,10 L-12,5 Z" fill="#1e3a8a" stroke="#fbbf24" stroke-width="1.5"/>
+                    <!-- Body -->
+                    <rect x="-6" y="-5" width="12" height="15" fill="#3b82f6" stroke="#222" stroke-width="1.5" rx="2"/>
+                    <!-- Shoulders -->
+                    <circle cx="-6" cy="-2" r="4" fill="#e2e8f0" stroke="#222" stroke-width="1"/>
+                    <circle cx="6" cy="-2" r="4" fill="#e2e8f0" stroke="#222" stroke-width="1"/>
+                    <!-- Head -->
+                    <circle cx="0" cy="-12" r="7" fill="#f8fafc" stroke="#222" stroke-width="1.5"/>
+                    <rect x="-4" y="-14" width="8" height="3" fill="#0f172a"/>
+                    <!-- Sword -->
+                    <rect x="8" y="-15" width="3" height="18" fill="#cbd5e1" stroke="#222" stroke-width="1"/>
+                    <rect x="5" y="-2" width="9" height="2" fill="#475569"/>
+                </g>`),
+            heroArcher: createSVG(50, 50, `
+                <g transform="translate(25, 30)">
+                    <rect x="-8" y="-5" width="16" height="15" fill="#166534" stroke="#222" stroke-width="1.5" rx="3"/>
+                    <!-- Bow -->
+                    <path d="M12,12 A15 15 0 0 0 12,-12" fill="none" stroke="#b45309" stroke-width="2.5" stroke-linecap="round"/>
+                    <path d="M12,12 L12,-12" stroke="#fff" stroke-width="0.5"/>
+                    <!-- Head & Hood -->
+                    <circle cx="0" cy="-12" r="8" fill="#fcd34d" stroke="#222" stroke-width="1.5"/>
+                    <path d="M-9,-12 A9 9 0 0 1 9,-12 L0,-24 Z" fill="#14532d" stroke="#222" stroke-width="1.5" stroke-linejoin="round"/>
+                </g>`),
+            heroPaladin: createSVG(60, 60, `
+                <g transform="translate(30, 35)">
+                    <!-- Body Armor -->
+                    <rect x="-12" y="-5" width="24" height="20" fill="#e2e8f0" stroke="#222" stroke-width="2" rx="3"/>
+                    <rect x="-12" y="10" width="24" height="5" fill="#fbbf24" stroke="#222" stroke-width="1.5"/>
+                    <!-- Hammer -->
+                    <rect x="15" y="-20" width="12" height="18" fill="#cbd5e1" stroke="#222" stroke-width="2" rx="1"/>
+                    <rect x="19" y="-2" width="4" height="22" fill="#78350f" stroke="#222" stroke-width="1.5"/>
+                    <!-- Head & Plume -->
+                    <circle cx="0" cy="-14" r="10" fill="#f8fafc" stroke="#222" stroke-width="2"/>
+                    <rect x="-6" y="-16" width="12" height="4" fill="#0f172a"/>
+                    <path d="M-3,-24 L-5,-32 L5,-32 L3,-24 Z" fill="#991b1b" stroke="#222" stroke-width="1.5" stroke-linejoin="round"/>
+                </g>`),
+            heroDragon: createSVG(70, 70, `
+                <g transform="translate(35, 35)">
+                    <!-- Wings (Back) -->
+                    <path d="M0,0 L-25,-25 L-30,-5 Z" fill="#7f1d1d" stroke="#222" stroke-width="2" stroke-linejoin="round"/>
+                    <!-- Body -->
+                    <ellipse cx="0" cy="5" rx="16" ry="12" fill="#b91c1c" stroke="#222" stroke-width="2"/>
+                    <!-- Tail -->
+                    <path d="M-15,5 Q-30,10 -25,25 Q-15,20 -10,15" fill="#b91c1c" stroke="#222" stroke-width="2"/>
+                    <!-- Head -->
+                    <circle cx="16" cy="-8" r="10" fill="#b91c1c" stroke="#222" stroke-width="2"/>
+                    <rect x="20" y="-12" width="3" height="3" fill="#fef08a"/>
+                    <!-- Horns -->
+                    <path d="M10,-15 L5,-25 L15,-17 Z" fill="#fcd34d" stroke="#222" stroke-width="1.5" stroke-linejoin="round"/>
+                </g>`)
+
+,
+            archerTower: createSVG(60, 80, `
+                <defs>
+                    <linearGradient id="atWood" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a16207"/><stop offset="100%" stop-color="#713f12"/></linearGradient>
+                    <linearGradient id="atRoof" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3b82f6"/><stop offset="100%" stop-color="#1e3a8a"/></linearGradient>
+                </defs>
+                <g transform="translate(30, 75)">
+                    <!-- Base shadow -->
+                    <ellipse cx="0" cy="0" rx="20" ry="8" fill="#111" opacity="0.5"/>
+                    <!-- Base stone -->
+                    <rect x="-20" y="-25" width="40" height="25" fill="#4b5563" stroke="#222" stroke-width="2" rx="2"/>
+                    <rect x="-18" y="-22" width="36" height="20" fill="#6b7280" stroke="#4b5563" stroke-width="1"/>
+                    <!-- Wood structure -->
+                    <rect x="-16" y="-50" width="32" height="25" fill="url(#atWood)" stroke="#222" stroke-width="2"/>
+                    <path d="M-10,-50 L-15,-25 M10,-50 L15,-25 M-16,-38 L16,-38" stroke="#4a2608" stroke-width="2"/>
+                    <!-- Roof -->
+                    <path d="M-22,-50 L0,-70 L22,-50 Z" fill="url(#atRoof)" stroke="#222" stroke-width="2" stroke-linejoin="round"/>
+                </g>
+            `),
+            mageTower: createSVG(60, 80, `
+                <defs>
+                    <linearGradient id="mtStone" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6b7280"/><stop offset="100%" stop-color="#374151"/></linearGradient>
+                    <linearGradient id="mtRoof" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a855f7"/><stop offset="100%" stop-color="#581c87"/></linearGradient>
+                </defs>
+                <g transform="translate(30, 75)">
+                    <!-- Base shadow -->
+                    <ellipse cx="0" cy="0" rx="20" ry="8" fill="#111" opacity="0.5"/>
+                    <!-- Base stone -->
+                    <path d="M-22,-20 L-18,0 L18,0 L22,-20 Z" fill="url(#mtStone)" stroke="#222" stroke-width="2" stroke-linejoin="round"/>
+                    <!-- Pillar -->
+                    <rect x="-14" y="-55" width="28" height="35" fill="url(#mtStone)" stroke="#222" stroke-width="2"/>
+                    <!-- Roof -->
+                    <path d="M-20,-55 L0,-75 L20,-55 Z" fill="url(#mtRoof)" stroke="#222" stroke-width="2" stroke-linejoin="round"/>
+                    <circle cx="0" cy="-75" r="4" fill="#facc15" stroke="#222" stroke-width="1.5"/>
+                </g>
+            `),
+            cannonTower: createSVG(60, 80, `
+                <defs>
+                    <linearGradient id="ctStone" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4b5563"/><stop offset="100%" stop-color="#1f2937"/></linearGradient>
+                    <linearGradient id="ctMetal" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#9ca3af"/><stop offset="100%" stop-color="#374151"/></linearGradient>
+                </defs>
+                <g transform="translate(30, 75)">
+                    <!-- Base shadow -->
+                    <ellipse cx="0" cy="0" rx="20" ry="8" fill="#111" opacity="0.5"/>
+                    <!-- Base stone -->
+                    <rect x="-22" y="-30" width="44" height="30" fill="url(#ctStone)" stroke="#222" stroke-width="2" rx="3"/>
+                    <circle cx="0" cy="-15" r="8" fill="#111" stroke="#222" stroke-width="1"/>
+                    <!-- Mount -->
+                    <path d="M-12,-30 L-10,-45 L10,-45 L12,-30 Z" fill="#6b7280" stroke="#222" stroke-width="2" stroke-linejoin="round"/>
+                    <!-- Cannon Barrel -->
+                    <rect x="0" y="-55" width="24" height="12" fill="url(#ctMetal)" stroke="#222" stroke-width="2" rx="2" transform="rotate(-15, 0, -49)"/>
+                    <circle cx="0" cy="-49" r="6" fill="#111827" stroke="#222" stroke-width="2"/>
+                </g>
+            `),
+            barracksTower: createSVG(60, 80, `
+                <defs>
+                    <linearGradient id="btBase" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#d1d5db"/><stop offset="100%" stop-color="#6b7280"/></linearGradient>
+                    <linearGradient id="btRoof" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ef4444"/><stop offset="100%" stop-color="#991b1b"/></linearGradient>
+                </defs>
+                <g transform="translate(30, 75)">
+                    <!-- Base shadow -->
+                    <ellipse cx="0" cy="0" rx="22" ry="9" fill="#111" opacity="0.5"/>
+                    <!-- Keep -->
+                    <rect x="-20" y="-45" width="40" height="45" fill="url(#btBase)" stroke="#222" stroke-width="2" rx="2"/>
+                    <rect x="-6" y="-15" width="12" height="15" fill="#111" stroke="#222" stroke-width="1.5" rx="4 4 0 0"/> <!-- Door -->
+                    <!-- Battlements -->
+                    <path d="M-22,-45 L-22,-55 L-14,-55 L-14,-45 L-6,-45 L-6,-55 L6,-55 L6,-45 L14,-45 L14,-55 L22,-55 L22,-45 Z" fill="url(#btRoof)" stroke="#222" stroke-width="2" stroke-linejoin="round"/>
+                </g>
+            `)
+        };
+
+        let brush = CELL.PATH, drawing = false;
+
+        // Utilities
+        const dist = (x1,y1,x2,y2) => Math.hypot(x2-x1, y2-y1);
+        const rand = (min, max) => Math.random() * (max - min) + min;
+        const addShake = (v) => { screenShake = Math.max(screenShake, v); };
+
+        // ==========================================
+        // 4. PROCEDURAL GRAPHICS (OFFSCREEN TERRAIN)
+        // ==========================================
+        function drawShadow(c, x, y, rx, ry, alpha=0.3) {
+            c.fillStyle = `rgba(0,0,0,${alpha})`; c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, Math.PI*2); c.fill();
+        }
+
+        
+        function renderTerrain() {
+            bgCtx.fillStyle = '#466a2b';
+            bgCtx.fillRect(0,0,CANVAS_W,CANVAS_H);
+            
+            // Noise patches for grass
+            for(let i=0; i<400; i++) {
+                bgCtx.fillStyle = Math.random()>0.5 ? '#3d5e24' : '#4f7830';
+                bgCtx.beginPath();
+                bgCtx.arc(rand(0,CANVAS_W), rand(0,CANVAS_H), rand(3,12), 0, Math.PI*2);
+                bgCtx.fill();
+            }
+
+            bgCtx.lineCap = 'round';
+            bgCtx.lineJoin = 'round';
+            
+            // Helper to draw connected paths
+            function drawAllPaths(ctx, offset = 0) {
+                ctx.beginPath();
+                for(let r=0; r<ROWS; r++) {
+                    for(let c=0; c<COLS; c++) {
+                        let v = map.grid[r][c];
+                        if(v === CELL.PATH || v === CELL.START || v === CELL.END) {
+                            let cx = c*TILE_SIZE+32, cy = r*TILE_SIZE+32;
+                            // Right
+                            if(c<COLS-1 && [CELL.PATH, CELL.START, CELL.END].includes(map.grid[r][c+1])) {
+                                ctx.moveTo(cx, cy + offset); ctx.lineTo(cx + TILE_SIZE, cy + offset);
+                            }
+                            // Down
+                            if(r<ROWS-1 && [CELL.PATH, CELL.START, CELL.END].includes(map.grid[r+1][c])) {
+                                ctx.moveTo(cx + offset, cy); ctx.lineTo(cx + offset, cy + TILE_SIZE);
+                            }
+                        }
+                    }
+                }
+                ctx.stroke();
+            }
+
+            // Base dirt
+            bgCtx.lineWidth = 44;
+            bgCtx.strokeStyle = '#a68a56'; // Darker edge
+            drawAllPaths(bgCtx);
+
+            bgCtx.lineWidth = 36;
+            bgCtx.strokeStyle = '#c7a972'; // Lighter center
+            drawAllPaths(bgCtx);
+
+            // Ruts
+            bgCtx.lineWidth = 4;
+            bgCtx.strokeStyle = 'rgba(0,0,0,0.15)';
+            drawAllPaths(bgCtx, -8);
+            drawAllPaths(bgCtx, 8);
+
+            // Edges (mud and stones)
+            for(let r=0; r<ROWS; r++) {
+                for(let c=0; c<COLS; c++) {
+                    let v = map.grid[r][c];
+                    if(v===CELL.PATH || v===CELL.START || v===CELL.END) {
+                        let cx = c*TILE_SIZE+32, cy = r*TILE_SIZE+32;
+                        for(let i=0; i<8; i++) {
+                            let ang = rand(0, Math.PI*2);
+                            let dist = rand(18, 26);
+                            bgCtx.fillStyle = rand(0,1)>0.5 ? '#4a3f2d' : '#3d5e24';
+                            bgCtx.beginPath(); bgCtx.arc(cx + Math.cos(ang)*dist, cy + Math.sin(ang)*dist, rand(2,4), 0, Math.PI*2); bgCtx.fill();
+                        }
+                    }
+                }
+            }
+            
+            // Slots & Start/End via SVGs
+            for(let r=0; r<ROWS; r++) {
+                for(let c=0; c<COLS; c++) {
+                    let cx = c*TILE_SIZE+32, cy = r*TILE_SIZE+32;
+                    if(map.grid[r][c] === CELL.SLOT) {
+                        if(SVGS.slot && SVGS.slot.complete) bgCtx.drawImage(SVGS.slot, cx - SVGS.slot.width/2, cy - SVGS.slot.height/2);
+                    } else if(map.grid[r][c] === CELL.START) {
+                        if(SVGS.start && SVGS.start.complete) bgCtx.drawImage(SVGS.start, cx - SVGS.start.width/2, cy - SVGS.start.height/2);
+                    } else if(map.grid[r][c] === CELL.END) {
+                        if(SVGS.end && SVGS.end.complete) bgCtx.drawImage(SVGS.end, cx - SVGS.end.width/2, cy - SVGS.end.height/2);
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // 5. CLASSES (ENTITIES)
+        // ==========================================
+                class FloatingText {
+            constructor(x, y, txt, col, size=16, dur=40) {
+                this.x = x; this.y = y; this.txt = txt; this.col = col; this.size = size;
+                this.life = dur; this.maxL = dur; this.vy = -1;
+            }
+            update() { this.y += this.vy; this.life--; }
+            draw(c) {
+                c.globalAlpha = this.life/this.maxL;
+                c.fillStyle = this.col; c.font = `bold ${this.size}px sans-serif`; c.textAlign = 'center';
+                c.shadowColor = '#000'; c.shadowBlur = 4;
+                c.fillText(this.txt, this.x, this.y);
+                c.shadowBlur = 0; c.globalAlpha = 1;
+            }
+        }
+
+        class HeroUnit {
+            constructor(type, lvl) {
+                this.type = type;
+                this.lvl = lvl;
+                this.skinId = getEquippedHeroSkin(type);
+                this.x = CANVAS_W/2; this.y = CANVAS_H/2;
+                if(waypoints.length > 0) { this.x = waypoints[waypoints.length-1].x; this.y = waypoints[waypoints.length-1].y; }
+                this.px = this.x; this.py = this.y;
+                this.tgtX = this.x; this.tgtY = this.y;
+                this.maxHp = (type==='paladin'? 1000 : 500) * (1 + 0.2*lvl); this.hp = this.maxHp;
+                this.dmg = (type==='archer' ? 40 : (type==='dragon' ? 60 : 30)) * (1 + 0.15*lvl);
+                this.range = type==='archer' ? 160 : (type==='dragon' ? 120 : 60);
+                this.spd = type==='dragon' ? 2.5 : 1.5;
+                this.state = 'IDLE';
+                this.cd = type==='archer' ? 30 : 60;
+                this.cdTimer = 0;
+                this.deadTimer = 0;
+                this.sel = false;
+            }
+            update() {
+                if(this.state === 'DEAD') {
+                    this.deadTimer--;
+                    if(this.deadTimer <= 0) { this.hp = this.maxHp; this.state = 'IDLE'; this.x = waypoints[waypoints.length-1].x; this.y = waypoints[waypoints.length-1].y; }
+                    return;
+                }
+                if(this.hp <= 0) { this.state = 'DEAD'; this.deadTimer = 900; return; } // 15 seconds dead
+
+                if(dist(this.x, this.y, this.tgtX, this.tgtY) > 5) {
+                    let ang = Math.atan2(this.tgtY - this.y, this.tgtX - this.x);
+                    let vx = Math.cos(ang) * this.spd; this.x += vx; this.y += Math.sin(ang) * this.spd; this.facingLeft = vx < 0;
+                    this.px = this.x; this.py = this.y;
+                }
+
+                this.cdTimer--;
+                if(this.cdTimer <= 0) {
+                    let targets = enemies.filter(e => dist(this.x, this.y, e.px, e.py) <= this.range && e.hp > 0 && (!e.fly || this.type !== 'paladin'));
+                    if(targets.length > 0) {
+                        let tgt = targets[0];
+                        let finalDmg = activeBoons.last_stand ? this.dmg * 2 : this.dmg;
+                        if(this.type === 'archer') projs.push(new Projectile(this.x, this.y-10, tgt, finalDmg, 'arrow', {tier:1}));
+                        else if(this.type === 'dragon') { parts.push(new Particle(tgt.px, tgt.py, '#ef4444', 5, 30)); enemies.forEach(e => { if(dist(e.px, e.py, tgt.px, tgt.py) < 60) e.takeDmg(finalDmg, 'magic'); }); }
+                        else { tgt.takeDmg(finalDmg, 'phys'); tgt.stun = 15; parts.push(new Particle(tgt.px, tgt.py, '#fff', 5, 10)); }
+                        this.cdTimer = this.cd; sfx('hit');
+                    }
+                }
+            }
+            draw(ctx) {
+                if(this.state === 'DEAD') {
+                    ctx.fillStyle = '#ef4444'; ctx.font = '12px sans-serif'; ctx.fillText("Reviving...", this.x-20, this.y-10);
+                    ctx.fillRect(this.x-15, this.y+5, 30 * (1 - this.deadTimer/900), 4);
+                    return;
+                }
+                drawShadow(ctx, this.x, this.y+10, 16, 8, 0.35);
+                
+                let curSkin = this.skinId || getEquippedHeroSkin(this.type);
+                let skinCanvas = getHeroSkinCanvas(this.type, curSkin);
+                
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                if(this.facingLeft) ctx.scale(-1, 1);
+                if(skinCanvas) {
+                    ctx.drawImage(skinCanvas, -24, -26, 48, 48);
+                } else {
+                    ctx.font = '24px sans-serif';
+                    let icon = this.type==='archer'?'🏹':(this.type==='dragon'?'🐉':'🛡️');
+                    ctx.fillText(icon, -12, 6);
+                }
+                ctx.restore();
+                
+                ctx.fillStyle = '#000'; ctx.fillRect(this.x-15, this.y-25, 30, 4);
+                ctx.fillStyle = '#22c55e'; ctx.fillRect(this.x-14, this.y-24, 28 * Math.max(0, this.hp/this.maxHp), 2);
+                
+                if(this.sel) {
+                    ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.arc(this.x, this.y, this.range, 0, Math.PI*2); ctx.stroke();
+                    ctx.beginPath(); ctx.arc(this.x, this.y, 18, 0, Math.PI*2); ctx.stroke();
+                }
+            }
+        }
+
+        class Particle {
+            constructor(x, y, col, speed, dur, r=3) {
+                this.x = x; this.y = y; this.col = col; this.r = r;
+                let a = rand(0, Math.PI*2); this.vx = Math.cos(a)*speed; this.vy = Math.sin(a)*speed;
+                this.life = dur; this.maxL = dur;
+                this.g = 0;
+            }
+            update() { this.x+=this.vx; this.y+=this.vy; this.vy+=this.g; this.vx*=0.92; if(this.g===0) this.vy*=0.92; else this.vy*=0.98; this.life--; }
+            draw(c) { c.globalAlpha = Math.max(0, this.life/this.maxL); c.fillStyle = this.col; c.beginPath(); c.arc(this.x, this.y, this.r, 0, Math.PI*2); c.fill(); c.globalAlpha = 1; }
+        }
+
+        class Decal {
+            constructor(x, y, type, dur=150) {
+                this.x = x; this.y = y; this.type = type; this.life = dur; this.maxL = dur;
+            }
+            update() { 
+                this.life--; 
+                // Fire pool damage tick
+                if(this.type === 'fire' && frames%15===0) {
+                    enemies.forEach(e => { if(!e.fly && dist(e.px,e.py,this.x,this.y)<40) e.takeDmg(10, 'magic'); });
+                }
+            }
+            draw(c) {
+                c.globalAlpha = this.type==='fire' ? 1 : this.life/this.maxL;
+                if(this.type === 'crater') {
+                    c.fillStyle = '#222'; c.beginPath(); c.ellipse(this.x, this.y, 20, 10, 0, 0, Math.PI*2); c.fill();
+                    c.fillStyle = '#111'; c.beginPath(); c.ellipse(this.x, this.y+2, 16, 8, 0, 0, Math.PI*2); c.fill();
+                } else if(this.type === 'fire') {
+                    c.fillStyle = (frames%10<5) ? 'rgba(239, 68, 68, 0.6)' : 'rgba(249, 115, 22, 0.6)';
+                    c.beginPath(); c.ellipse(this.x, this.y, 35, 20, 0, 0, Math.PI*2); c.fill();
+                    if(Math.random()<0.3) parts.push(new Particle(this.x+rand(-20,20), this.y+rand(-10,10), '#facc15', 1, 20, 2));
+                }
+                c.globalAlpha = 1;
+            }
+        }
+
+        
+        class Enemy {
+            constructor(type, mHp, spd, rw, r, col) {
+                this.type = type; this.maxHp = mHp; this.hp = mHp;
+                this.spd = spd + wave*0.02; this.reward = rw; this.r = r; this.col = col;
+                this.fly = type === ENEMY.FLYING; this.heavy = type === ENEMY.HEAVY || type === ENEMY.BOSS;
+                
+                this.armor = this.heavy ? 50 : (this.fly ? 10 : 0);
+                this.magicRes = type === ENEMY.MAGIC ? 70 : 0;
+                if(type === ENEMY.BOSS) { this.armor = 60; this.magicRes = 40; }
+                
+                if (gameMode === 'ROGUELIKE' && currentElement) {
+                    this.col = currentElement.col;
+                    if (currentElement.id === 'Nature') this.maxHp *= 1.2;
+                    if (currentElement.id === 'Earth') this.armor = 60;
+                    if (currentElement.id === 'Arcane') this.magicRes = 50;
+                    if (currentElement.id === 'Frost') this.spd *= 0.9;
+                }
+                
+                if (activeBoons.global_frost) this.spd *= 0.85;
+                this.hp = this.maxHp;
+                
+                this.pIdx = 0; this.x = waypoints[0].x; this.y = waypoints[0].y;
+                this.ox = rand(-12,12); this.oy = rand(-12,12);
+                this.blocked = false; this.poison = 0; this.stun = 0; this.shattered = 0;
+                this.bob = rand(0, Math.PI*2);
+                
+                this.hitTimer = 0;
+                this.facingLeft = false;
+            }
+            get px() { return this.x + (this.fly ? 0 : this.ox); }
+            get py() { return this.y + (this.fly ? 0 : this.oy); }
+
+            takeDmg(amt, type, source='norm') {
+                if(this.hp <= 0) return;
+                let isCrit = false;
+                
+                if (activeBoons.lethal_snipe && Math.random() < 0.05 && source !== 'poison') {
+                    amt *= 3;
+                    type = 'true';
+                    isCrit = true;
+                }
+                
+                if(activeBoons.mage_shatter && type === 'magic') {
+                    this.shattered = 240; // 4 seconds
+                }
+                
+                let curArmor = this.shattered > 0 ? this.armor * 0.8 : this.armor;
+                if (gameMode === 'ROGUELIKE' && currentElement && currentElement.id === 'Earth') curArmor = 60;
+                
+                if(type === 'phys') amt *= (100 - curArmor)/100;
+                else if(type === 'magic') amt *= (100 - this.magicRes)/100;
+                if(source === 'headshot') { amt = this.maxHp*10; isCrit = true; } 
+                
+                this.hp -= amt;
+                this.hitTimer = 5;
+                if(amt > 0) sfx('hit', 0.5);
+                
+                if(source === 'poison') texts.push(new FloatingText(this.px, this.py-20, Math.ceil(amt), '#22c55e', 12, 20));
+                else if(isCrit) texts.push(new FloatingText(this.px, this.py-25, 'CRIT!', '#facc15', 20, 30));
+                else if(amt > this.maxHp*0.1) texts.push(new FloatingText(this.px, this.py-15, Math.ceil(amt), type==='magic'?'#a855f7':'#fff', 14, 20));
+                
+                for(let i=0; i<(isCrit?10:3); i++) {
+                    let p = new Particle(this.px, this.py-10, type==='magic'?'#d8b4fe':'#ef4444', 3, 20);
+                    p.g = 0.2; parts.push(p);
+                }
+
+                if(this.hp <= 0) this.die();
+            }
+
+            die() {
+                if(this.pIdx >= waypoints.length) return; 
+                gold += this.reward * (waveData.swarm ? 2 : 1) + (activeBoons.midas_touch ? 2 : 0);
+                if (gameMode === 'ROGUELIKE' && currentElement && currentElement.id === 'Fire') {
+                    // Explode
+                    let closeT = towers.filter(t => t.type === TOWER.BARRACKS || t.type === 'guards' || t.type === 'titan');
+                    closeT.forEach(t => {
+                        t.soldiers.forEach(s => {
+                            if(dist(s.x, s.y, this.px, this.py) < 60) s.hp -= 20;
+                        });
+                    });
+                }
+                sfx('coin', 0.2);
+                texts.push(new FloatingText(this.px, this.py-10, `+${this.reward*(waveData.swarm?2:1)}`, '#fde047', 16, 40));
+                if(this.type === ENEMY.BOSS) {
+                    metaGems += 1; metaGold += 50; saveMeta();
+                    texts.push(new FloatingText(this.px, this.py-30, "+1 💎", '#60a5fa', 20, 60));
+                }
+                
+                // Juicy Death Particles
+                let pCol = '#fff';
+                if(this.type===ENEMY.LIGHT) pCol='#6b9338';
+                if(this.type===ENEMY.HEAVY) pCol='#64748b';
+                if(this.type===ENEMY.FLYING) pCol='#3d3b59';
+                if(this.type===ENEMY.MAGIC) pCol='#10b981';
+                if(this.type===ENEMY.BOSS) pCol='#b91c1c';
+                
+                for(let i=0; i<10; i++) {
+                    let p = new Particle(this.px, this.py, pCol, rand(2,5), rand(30,50), rand(3,6));
+                    p.g = 0.15; // Gravity
+                    parts.push(p);
+                }
+                
+                let necros = towers.filter(t => t.branch === 'B' && t.type === TOWER.MAGE && dist(t.x, t.y, this.px, this.py) <= t.range);
+                if(necros.length > 0 && !this.fly && this.type !== ENEMY.BOSS) {
+                    let n = necros[0];
+                    if(n.soldiers.length < 3) n.soldiers.push(new Soldier(n, this.px, this.py, true));
+                }
+                if(this.type === ENEMY.BOSS) document.getElementById('boss-hp-container').classList.add('hidden');
+            }
+
+            update() {
+                if(this.hitTimer > 0) this.hitTimer--;
+                if(this.stun > 0) { this.stun--; return; }
+                if(this.poison > 0 && frames % 30 === 0) { this.takeDmg(this.maxHp * 0.02, 'true', 'poison'); this.poison--; }
+                
+                if(this.type === ENEMY.HEAVY && frames % 30 === 0 && !this.blocked) {
+                    let p = new Particle(this.px, this.py+15, '#78716c', 1, 15, 2);
+                    p.g = 0; parts.push(p);
+                }
+                if(this.type === ENEMY.BOSS && frames % 40 === 0 && !this.blocked) {
+                    addShake(1);
+                }
+                
+                this.bob += (this.fly ? 0.3 : 0.2);
+                if(this.blocked) return;
+
+                let tp = waypoints[this.pIdx], dx = tp.x - this.x, dy = tp.y - this.y, d = Math.hypot(dx, dy);
+                if(dx < 0) this.facingLeft = true;
+                else if(dx > 0) this.facingLeft = false;
+
+                if(d < this.spd) {
+                    this.x = tp.x; this.y = tp.y; this.pIdx++;
+                    if(this.pIdx >= waypoints.length) {
+                        hp -= (this.type===ENEMY.BOSS ? 10 : (this.heavy ? 2 : 1));
+                        sfx('hit', 0);
+                        this.hp = 0; texts.push(new FloatingText(this.px, this.py, `-HP`, '#ef4444', 24, 60));
+                    }
+                } else {
+                    this.x += (dx/d)*this.spd; this.y += (dy/d)*this.spd; this.facingLeft = dx < 0;
+                }
+                
+                if(this.type === ENEMY.BOSS) {
+                    let hpb = document.getElementById('boss-hp-bar');
+                    hpb.style.width = Math.max(0, (this.hp/this.maxHp)*100) + '%';
+                }
+            }
+
+            draw(c) {
+                let x = this.px, y = this.py;
+                let tick = this.bob;
+                
+                // Flying Shadow
+                if(this.fly) {
+                    c.fillStyle = 'rgba(0,0,0,0.4)';
+                    c.beginPath(); c.ellipse(x, y + 15, 12 + Math.sin(tick)*2, 6, 0, 0, Math.PI*2); c.fill();
+                    y -= 15 + Math.sin(tick)*3;
+                } else {
+                    drawShadow(c, x, y+this.r, this.r, this.r/2);
+                }
+                
+                c.save();
+                c.translate(x, y);
+                if(this.facingLeft) c.scale(-1, 1);
+                
+                if(this.hitTimer > 0) c.filter = 'brightness(300%)';
+                
+                if(this.type === ENEMY.LIGHT) { // Goblin
+                    let bobY = Math.abs(Math.sin(tick*1.5)) * 4;
+                    c.translate(0, -bobY);
+                    c.fillStyle = '#6b9338'; c.beginPath(); c.arc(0, 0, 10, 0, Math.PI*2); c.fill(); // Body
+                    // Ears
+                    c.beginPath(); c.moveTo(-5, -5); c.lineTo(-15, -10); c.lineTo(-8, 0); c.fill();
+                    c.beginPath(); c.moveTo(5, -5); c.lineTo(15, -10); c.lineTo(8, 0); c.fill();
+                    // Vest & Belt
+                    c.fillStyle = '#5c4033'; c.fillRect(-8, 0, 16, 12);
+                    c.fillStyle = '#3e2723'; c.fillRect(-9, 8, 18, 3);
+                    // Hat
+                    c.fillStyle = '#4e342e'; c.beginPath(); c.moveTo(-10, -8); c.lineTo(0, -20); c.lineTo(10, -8); c.fill();
+                    // Dagger
+                    c.save(); c.translate(10, 5); c.rotate(Math.sin(tick)*0.5);
+                    c.fillStyle = '#ccc'; c.beginPath(); c.moveTo(0,0); c.lineTo(15, -5); c.lineTo(0, 5); c.fill();
+                    c.fillStyle = '#4e342e'; c.fillRect(-2, -2, 4, 8);
+                    c.restore();
+                    
+                } else if (this.type === ENEMY.HEAVY) { // Orc
+                    let bobA = Math.sin(tick) * 0.2;
+                    c.rotate(bobA);
+                    c.fillStyle = '#4a5d23'; c.beginPath(); c.arc(0, 0, 16, 0, Math.PI*2); c.fill(); // Body
+                    // Helmet
+                    c.fillStyle = '#374151'; c.beginPath(); c.arc(0, -4, 17, Math.PI, 0); c.fill();
+                    c.fillStyle = '#d1d5db'; c.beginPath(); c.moveTo(-10, -10); c.lineTo(-18, -25); c.lineTo(-5, -15); c.fill();
+                    c.beginPath(); c.moveTo(10, -10); c.lineTo(18, -25); c.lineTo(5, -15); c.fill();
+                    // Armor
+                    c.fillStyle = '#4b5563'; c.fillRect(-16, -2, 32, 10);
+                    // Shield (Left hand, front)
+                    c.fillStyle = '#5c4033'; c.fillRect(8, -10, 8, 26);
+                    c.fillStyle = '#9ca3af'; c.fillRect(6, -8, 12, 4); c.fillRect(6, 10, 12, 4);
+                    // Hammer (Right hand)
+                    c.save(); c.translate(-10, 10); c.rotate(Math.sin(tick)*0.3);
+                    c.fillStyle = '#4e342e'; c.fillRect(-15, -2, 20, 4);
+                    c.fillStyle = '#6b7280'; c.fillRect(-20, -8, 10, 16);
+                    c.restore();
+                    
+                } else if (this.type === ENEMY.FLYING) { // Gargoyle
+                    let flap = Math.sin(tick*1.5);
+                    // Wings
+                    c.fillStyle = '#2d2b42';
+                    c.save(); c.scale(1, flap);
+                    c.beginPath(); c.moveTo(-5, 0); c.lineTo(-25, -20); c.lineTo(-15, 10); c.fill();
+                    c.beginPath(); c.moveTo(5, 0); c.lineTo(25, -20); c.lineTo(15, 10); c.fill();
+                    c.restore();
+                    // Body
+                    c.fillStyle = '#3d3b59'; c.beginPath(); c.arc(0, 0, 12, 0, Math.PI*2); c.fill();
+                    // Eye
+                    c.fillStyle = '#ef4444'; c.beginPath(); c.arc(8, -2, 3, 0, Math.PI*2); c.fill();
+                    
+                } else if (this.type === ENEMY.MAGIC) { // Necromancer
+                    // Fog base
+                    c.fillStyle = '#111827'; c.beginPath(); c.arc(0, 5, 14, 0, Math.PI*2); c.fill();
+                    c.globalAlpha = 0.5; c.beginPath(); c.arc(0, 12, 16 + Math.sin(tick)*2, 0, Math.PI*2); c.fill(); c.globalAlpha = 1;
+                    // Cloak
+                    c.fillStyle = '#4c1d95'; c.beginPath(); c.moveTo(-12, 10); c.lineTo(0, -15); c.lineTo(12, 10); c.fill();
+                    // Hood
+                    c.fillStyle = '#000'; c.beginPath(); c.arc(0, -5, 8, 0, Math.PI*2); c.fill();
+                    // Eyes
+                    c.fillStyle = '#3b82f6'; c.beginPath(); c.arc(4, -5, 1.5, 0, Math.PI*2); c.fill();
+                    // Staff
+                    c.fillStyle = '#4e342e'; c.fillRect(12, -10, 3, 25);
+                    // Orb
+                    let orbPulse = 1 + Math.sin(tick*2)*0.2;
+                    c.fillStyle = '#10b981'; c.beginPath(); c.arc(13.5, -12, 5 * orbPulse, 0, Math.PI*2); c.fill();
+                    c.fillStyle = 'rgba(16, 185, 129, 0.4)'; c.beginPath(); c.arc(13.5, -12, 10 * orbPulse, 0, Math.PI*2); c.fill();
+                    
+                } else if (this.type === ENEMY.BOSS) { // Golem
+                    let bobA = Math.sin(tick)*0.1;
+                    c.translate(0, Math.abs(Math.sin(tick))*2);
+                    c.rotate(bobA);
+                    // Body base
+                    c.fillStyle = '#374151'; c.beginPath(); c.arc(0, 0, 28, 0, Math.PI*2); c.fill();
+                    // Lava cracks
+                    c.strokeStyle = '#dc2626'; c.lineWidth = 3;
+                    c.beginPath(); c.moveTo(-10, -10); c.lineTo(0, 0); c.lineTo(-5, 15); c.stroke();
+                    c.beginPath(); c.moveTo(10, -5); c.lineTo(15, 10); c.stroke();
+                    // Shoulders / Gear
+                    c.fillStyle = '#4b5563'; c.beginPath(); c.arc(-15, -15, 12, 0, Math.PI*2); c.fill();
+                    c.fillStyle = '#4b5563'; c.beginPath(); c.arc(15, -15, 12, 0, Math.PI*2); c.fill();
+                    // Chains
+                    c.strokeStyle = '#9ca3af'; c.lineWidth = 4;
+                    c.beginPath(); c.moveTo(-15, -15); c.lineTo(15, 10); c.stroke();
+                    // Head
+                    c.fillStyle = '#1f2937'; c.fillRect(8, -10, 12, 16);
+                    c.fillStyle = '#fef08a'; c.fillRect(16, -6, 4, 4); // Eye
+                }
+                
+                c.restore();
+                
+                // Status effects on top
+                if(this.stun > 0) {
+                    c.save(); c.translate(x, y - this.r - 10); c.rotate(frames*0.2);
+                    c.fillStyle = '#facc15'; c.fillRect(-10, -2, 20, 4); c.fillRect(-2, -10, 4, 20);
+                    c.restore();
+                }
+                if(this.poison > 0) {
+                    c.fillStyle = 'rgba(34, 197, 94, 0.6)'; c.beginPath(); c.arc(x, y - this.r, 6 + Math.sin(frames*0.3)*2, 0, Math.PI*2); c.fill();
+                    if(frames%10===0) { let p = new Particle(x, y-this.r, '#22c55e', 0, 15, 3); p.g = -0.05; parts.push(p); }
+                }
+            }
+        }
+
+class Soldier {
+            constructor(tw, x, y, isSkel=false) {
+                this.tw = tw; this.x = x; this.y = y; this.isSkel = isSkel;
+                let lvl = tw.tier || 1;
+                this.maxHp = isSkel ? 80 : (50 + 40*lvl); 
+                if(tw.branch==='A') this.maxHp = 250; // Paladin
+                if(tw.type === 'guards') this.maxHp = 1000;
+                if(tw.type === 'archers') this.maxHp = 500;
+                if(tw.type === 'titan') this.maxHp = 10000;
+                if(tw.type === 'dragon') this.maxHp = 10000;
+                
+                // Hero Bonus
+                if(activeHero === 'paladin' && !isSkel) this.maxHp *= (1 + 0.2*heroes.paladin.level);
+                if(activeBoons.barracks_buff) this.maxHp *= 1.5;
+                
+                this.hp = this.maxHp;
+                this.dmg = isSkel ? 10 : (5 + 5*lvl);
+                if(tw.branch==='B') this.dmg = 30; // Barbarian
+                if(tw.type === 'guards') this.dmg = 100;
+                if(tw.type === 'archers') this.dmg = 50;
+                if(tw.type === 'titan') this.dmg = 300;
+                if(tw.type === 'dragon') this.dmg = 300;
+                
+                this.type = (tw.type === 'archers' || tw.type === 'dragon') ? 'ranged' : 'melee';
+                this.range = this.type === 'ranged' ? 200 : 30;
+                
+                this.target = null; this.state = 'MOVE'; this.revived = false;
+                this.bob = rand(0,10);
+                this.frozen = 0;
+                this.atkTimer = 0;
+            }
+            update() {
+                if(this.tw.type === 'titan' || this.tw.type === 'dragon') {
+                    if(!this.targets) this.targets = [];
+                    
+                    // Filter dead or out of range
+                    this.targets = this.targets.filter(e => {
+                        if(e.hp <= 0 || dist(this.x, this.y, e.px, e.py) > this.range) {
+                            e.blocked = false; return false;
+                        }
+                        return true;
+                    });
+                    
+                    if(this.hp <= 0) {
+                        this.targets.forEach(e => e.blocked = false);
+                        this.targets = [];
+                        this.state = 'DEAD';
+                        return;
+                    }
+                    
+                    this.bob += 0.2;
+                    let canBlockFly = true; // Both Titan and Dragon block flying
+                    
+                    for(let e of enemies) {
+                        if(this.targets.length >= (this.blockCap || 99)) break;
+                        if((!e.fly || canBlockFly) && !e.blocked && dist(this.x, this.y, e.px, e.py) < this.range) {
+                            e.blocked = true;
+                            this.targets.push(e);
+                        }
+                    }
+                    
+                    if(this.targets.length > 0) {
+                        this.state = 'COMBAT';
+                        if(frames % 60 === 0) {
+                            this.targets.forEach(e => e.takeDmg(this.dmg, 'phys'));
+                            sfx('hit');
+                            if(this.tw.type === 'titan') addShake(5);
+                            parts.push(new Particle(this.x, this.y-10, this.tw.type === 'titan' ? '#fbbf24' : '#ef4444', 5, 20));
+                            
+                            let dmgTaken = (5 + wave) * this.targets.length;
+                            this.hp -= dmgTaken;
+                            texts.push(new FloatingText(this.x, this.y-15, `-${dmgTaken}`, '#fca5a5', 12, 30));
+                        }
+                    } else {
+                        this.state = 'IDLE';
+                        let rx = this.tw.rallyX;
+                        let ry = this.tw.rallyY;
+                        let d = dist(this.x, this.y, rx, ry);
+                        if(d > 2) { this.x += (rx-this.x)/d * 2; this.y += (ry-this.y)/d * 2; }
+                    }
+                    return;
+                }
+
+                if(this.tw.type === 'archers') {
+                    if(this.hp <= 0) {
+                        this.state = 'DEAD';
+                        return;
+                    }
+                    this.bob += 0.2;
+                    // Find target to shoot
+                    let tgt = enemies.find(e => e.hp > 0 && dist(this.x, this.y, e.px, e.py) < this.range);
+                    if(tgt) {
+                        this.facingLeft = tgt.px < this.x;
+                        if(frames % 60 === 0) {
+                            projs.push(new Projectile(this.x, this.y-10, tgt, this.dmg, 'arrow', this.tw));
+                            sfx('arrow');
+                        }
+                    } else {
+                        // Wander around rally point slightly
+                        let ang = (Math.PI*2/this.tw.soldiers.length) * this.tw.soldiers.indexOf(this);
+                        let rx = this.tw.rallyX + Math.cos(ang)*40;
+                        let ry = this.tw.rallyY + Math.sin(ang)*40;
+                        let d = dist(this.x, this.y, rx, ry);
+                        if(d > 2) { this.x += (rx-this.x)/d * 2; this.y += (ry-this.y)/d * 2; }
+                    }
+                    return;
+                }
+
+                if(this.hp <= 0) {
+                    if(this.tw.branch==='A' && !this.revived && !this.isSkel) {
+                        this.hp = this.maxHp * 0.5; this.revived = true;
+                        texts.push(new FloatingText(this.x, this.y-20, 'REVIVE', '#facc15', 14));
+                        return;
+                    }
+                    this.state = 'DEAD';
+                    if(this.target) { this.target.blocked = false; this.target = null; }
+                    if(this.isSkel) this.tw.soldiers = this.tw.soldiers.filter(s => s!==this);
+                    return;
+                }
+                this.bob += 0.2;
+
+                if(this.target) {
+                    if(this.target.hp <= 0 || dist(this.x, this.y, this.target.px, this.target.py) > 80) {
+                        this.target.blocked = false; this.target = null; this.state = 'MOVE';
+                    } else {
+                        if(frames % 60 === 0) {
+                            if(this.tw.branch === 'B' && !this.isSkel) {
+                                // Cleave
+                                enemies.forEach(e => { if(!e.fly && dist(this.x,this.y,e.px,e.py)<40) e.takeDmg(this.dmg, 'phys'); });
+                                this.hp = Math.min(this.maxHp, this.hp + this.dmg*0.3); // Lifesteal
+                                parts.push(new Particle(this.x, this.y, '#ef4444', 3, 10)); // slash visual
+                            } else {
+                                
+                                parts.push(new Particle((this.x+this.target.px)/2, (this.y+this.target.py)/2, '#fff', 3, 10));
+                            }
+                            let dmgTaken = 5 + wave;
+                            this.hp -= dmgTaken; // Take enemy dmg
+                            texts.push(new FloatingText(this.x, this.y-15, `-${dmgTaken}`, '#fca5a5', 12, 30));
+                            sfx('hit');
+                        }
+                    }
+                } else {
+                    for(let e of enemies) {
+                        if(!e.fly && !e.blocked && dist(this.x, this.y, e.px, e.py) < 70) {
+                            this.target = e; e.blocked = true; this.state = 'COMBAT';
+                            this.x = e.px + rand(-10,10); this.y = e.py + rand(-10,10); break;
+                        }
+                    }
+                    if(!this.target && !this.isSkel) {
+                        let idx = this.tw.soldiers.indexOf(this);
+                        let rx, ry;
+                        if(this.tw.type === 'guards' || this.tw.type === 'archers') {
+                            // Spread out 10 units nicely
+                            let ang = (Math.PI*2/this.tw.soldiers.length) * idx;
+                            let rad = this.tw.type === 'archers' ? 40 : 25;
+                            rx = this.tw.rallyX + Math.cos(ang)*rad;
+                            ry = this.tw.rallyY + Math.sin(ang)*rad;
+                        } else {
+                            rx = this.tw.rallyX + (idx===0?-15:(idx===1?15:0));
+                            ry = this.tw.rallyY + (idx===2?-15:10);
+                        }
+                        let d = dist(this.x, this.y, rx, ry);
+                        if(d > 2) { this.x += (rx-this.x)/d * 2; this.y += (ry-this.y)/d * 2; }
+                    } else if(this.isSkel) {
+                        // Skeleton idle wander
+                        if(frames%100===0) { this.tx = this.tw.x+rand(-50,50); this.ty = this.tw.y+rand(-50,50); }
+                        if(this.tx) {
+                            let d = dist(this.x, this.y, this.tx, this.ty);
+                            if(d > 2) { this.x += (this.tx-this.x)/d; this.y += (this.ty-this.y)/d; }
+                        }
+                    }
+                }
+            }
+            draw(c) {
+                if(this.state === 'DEAD') return;
+                let y = this.y + (this.state==='MOVE'?Math.abs(Math.sin(this.bob))*4:0);
+                drawShadow(c, this.x, y+8, 8, 4);
+                
+                if(this.isSkel) {
+                    c.fillStyle = '#e5e7eb'; c.fillRect(this.x-4, y-8, 8, 16); c.fillStyle = '#111'; c.fillRect(this.x-2, y-6, 2, 2); c.fillRect(this.x+2, y-6, 2, 2);
+                } else if(this.tw.branch === 'A') { // Paladin
+                    c.fillStyle = '#f8fafc'; c.fillRect(this.x-6, y-10, 12, 18);
+                    c.fillStyle = '#fbbf24'; c.fillRect(this.x-7, y-12, 14, 4); // Helmet
+                    c.fillStyle = '#60a5fa'; c.beginPath(); c.arc(this.x-8, y, 6, 0, Math.PI*2); c.fill(); // Shield
+                } else if(this.tw.branch === 'B') { // Barbarian
+                    c.fillStyle = '#d97706'; c.fillRect(this.x-5, y-8, 10, 16);
+                    c.fillStyle = '#ef4444'; c.fillRect(this.x-5, y-8, 10, 4); // Warpaint
+                    c.fillStyle = '#9ca3af'; c.fillRect(this.x+5, y-4, 8, 2); c.fillRect(this.x-13, y-4, 8, 2); // Dual axes
+                } else if (this.tw.type === 'titan') {
+                    c.fillStyle = '#78716c'; c.fillRect(this.x-15, y-20, 30, 40); // Big stone body
+                    c.fillStyle = '#fbbf24'; c.fillRect(this.x-10, y-15, 20, 10); // Gold head
+                } else if (this.tw.type === 'dragon') {
+                    c.fillStyle = '#10b981'; c.fillRect(this.x-20, y-10, 40, 20); // Big green dragon
+                    c.fillStyle = '#047857'; c.beginPath(); c.moveTo(this.x-20, y-10); c.lineTo(this.x-30, y-30); c.lineTo(this.x-10, y-10); c.fill(); // Left wing
+                    c.beginPath(); c.moveTo(this.x+20, y-10); c.lineTo(this.x+30, y-30); c.lineTo(this.x+10, y-10); c.fill(); // Right wing
+                } else if (this.tw.type === 'guards') {
+                    c.fillStyle = '#475569'; c.fillRect(this.x-6, y-10, 12, 18);
+                    c.fillStyle = '#cbd5e1'; c.fillRect(this.x-7, y-12, 14, 4); // Helmet
+                    c.fillStyle = '#e2e8f0'; c.fillRect(this.x-10, y-4, 4, 14); // Big shield
+                } else if (this.tw.type === 'archers') {
+                    c.fillStyle = '#16a34a'; c.fillRect(this.x-5, y-8, 10, 16);
+                    c.fillStyle = '#22c55e'; c.beginPath(); c.arc(this.x, y-10, 5, 0, Math.PI*2); c.fill(); // Hood
+                    c.strokeStyle = '#b45309'; c.lineWidth = 2; c.beginPath(); c.arc(this.x+5, y, 6, -Math.PI/2, Math.PI/2); c.stroke(); // Bow
+                } else {
+                    c.fillStyle = '#3b82f6'; c.beginPath(); c.arc(this.x, y, 6, 0, Math.PI*2); c.fill();
+                    c.fillStyle = '#9ca3af'; c.fillRect(this.x+4, y-4, 8, 2); // Sword
+                }
+                
+                let hpOffset = (this.tw.type === 'titan' || this.tw.type === 'dragon') ? -25 : -14;
+                let hpWidth = (this.tw.type === 'titan' || this.tw.type === 'dragon') ? 32 : 16;
+                c.fillStyle = '#000'; c.fillRect(this.x - hpWidth/2, y + hpOffset, hpWidth, 4);
+                c.fillStyle = '#22c55e'; c.fillRect(this.x - hpWidth/2 + 1, y + hpOffset + 1, (hpWidth-2)*Math.max(0, this.hp/this.maxHp), 2);
+            }
+        }
+
+        class Projectile {
+            constructor(x, y, tgt, dmg, type, tw) {
+                this.x = x; this.y = y; this.tgt = tgt; this.dmg = dmg; this.type = type; this.tw = tw;
+                this.spd = (type==='aoe'||type==='missile') ? 6 : 12;
+                this.active = true; this.tx = tgt.px; this.ty = tgt.py;
+                if(type === 'missile') this.ty -= 100; // Arcing
+            }
+            update() {
+                if(!this.active) return;
+                if(this.tgt && this.tgt.hp > 0 && this.type !== 'aoe') { this.tx = this.tgt.px; this.ty = this.tgt.py; }
+                let dx = this.tx - this.x, dy = this.ty - this.y, d = Math.hypot(dx, dy);
+                if(d < this.spd) this.hit();
+                else { this.x += (dx/d)*this.spd; this.y += (dy/d)*this.spd; this.facingLeft = dx < 0; }
+                
+                if(this.type === 'missile') parts.push(new Particle(this.x, this.y, '#f97316', 0, 10, 2));
+            }
+            hit() {
+                this.active = false;
+                if(this.type === 'aoe' || this.type === 'missile') {
+                    sfx('cannon');
+                    decals.push(new Decal(this.tx, this.ty, this.type==='missile'?'fire':'crater', this.type==='missile'?200:100));
+                    for(let i=0; i<15; i++) parts.push(new Particle(this.tx, this.ty, '#fb923c', 4, 30));
+                    let rad = this.type==='missile'?80:50;
+                    enemies.forEach(e => { if(!e.fly && dist(e.px,e.py,this.tx,this.ty)<rad) e.takeDmg(this.dmg, 'phys'); });
+                } else if(this.type === 'lightning') { // Tesla
+                    sfx('tesla');
+                    this.tgt.takeDmg(this.dmg, 'magic');
+                    if(Math.random()<0.2) this.tgt.stun = 30;
+                    // Draw flash
+                    ctx.strokeStyle='#fff'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(this.tw.x, this.tw.y-30); ctx.lineTo(this.tgt.px, this.tgt.py); ctx.stroke();
+                    // Chain
+                    let chained = 0, last = this.tgt;
+                    for(let e of enemies) {
+                        if(e !== this.tgt && dist(last.px, last.py, e.px, e.py) < 100 && chained < 3) {
+                            e.takeDmg(this.dmg*0.5, 'magic');
+                            if(Math.random()<0.2) e.stun = 30;
+                            ctx.beginPath(); ctx.moveTo(last.px, last.py); ctx.lineTo(e.px, e.py); ctx.stroke();
+                            last = e; chained++;
+                        }
+                    }
+                } else {
+                    let source = 'norm';
+                    if(this.tw.branch === 'B' && this.tw.type === TOWER.ARCHER) { // Musketeer Headshot
+                        if(Math.random() < 0.1) source = 'headshot';
+                        // Shotgun splash
+                        enemies.forEach(e => { if(e!==this.tgt && dist(e.px,e.py,this.tx,this.ty)<30) e.takeDmg(this.dmg*0.3, 'phys'); });
+                    }
+                    if(this.tgt && this.tgt.hp>0) {
+                        this.tgt.takeDmg(this.dmg, this.type, source);
+                        if(this.tw.branch === 'A' && this.tw.type === TOWER.ARCHER) this.tgt.poison = 150; // Ranger Poison
+                    }
+                }
+            }
+            draw(c) {
+                if(this.type === 'lightning' || this.type === 'beam') return; // Handled instantly or in tower
+                c.fillStyle = this.type==='magic'?'#a855f7':(this.type==='aoe'?'#111':(this.type==='missile'?'#ef4444':'#facc15'));
+                c.beginPath(); 
+                if(this.type==='missile') c.fillRect(this.x-3, this.y-8, 6, 16);
+                else c.arc(this.x, this.y, this.type==='aoe'?6:3, 0, Math.PI*2); 
+                c.fill();
+            }
+        }
+
+        class Tower {
+            constructor(c, r, type) {
+                this.c = c; this.r = r; this.type = type;
+                this.x = c*TILE_SIZE + 32; this.y = r*TILE_SIZE + 32;
+                this.tier = 1; this.branch = null; this.spent = TOWER_STATS[type].cost;
+                this.range = TOWER_STATS[type].r; this.cd = TOWER_STATS[type].cd; this.dmg = TOWER_STATS[type].dmg;
+                
+                // Hero Bonuses
+                if(activeHero === 'archer' && type === TOWER.ARCHER) this.dmg *= (1 + 0.1*heroes.archer.level);
+                if(activeHero === 'dragon' && type === TOWER.MAGE) this.dmg *= (1 + 0.15*heroes.dragon.level);
+                
+                this.cdTimer = 0; this.anim = 0;
+                
+                // Mage Beam state
+                this.beamTgt = null; this.beamDmg = 0;
+                
+                if(type === TOWER.BARRACKS) {
+                    this.rallyX = this.x; this.rallyY = this.y;
+                    let minD = Infinity;
+                    for(let i=0; i<ROWS; i++) for(let j=0; j<COLS; j++) {
+                        if(map.grid[i][j]===CELL.PATH) {
+                            let px = j*TILE_SIZE+32, py = i*TILE_SIZE+32, d = dist(px,py,this.x,this.y);
+                            if(d<minD) { minD=d; this.rallyX=px; this.rallyY=py; }
+                        }
+                    }
+                    this.soldiers = [new Soldier(this,this.x,this.y), new Soldier(this,this.x,this.y), new Soldier(this,this.x,this.y)];
+                } else this.soldiers = [];
+            }
+
+            upgrade(branch = null) {
+                if(this.tier >= 4) return;
+                if(this.tier === 3 && !branch) return; // Must pick branch
+                let cost = this.tier < 3 ? Math.floor(TOWER_STATS[this.type].cost * (this.tier+1) * 0.8) : BRANCHES[this.type][branch].cost;
+                if(gold >= cost) {
+                    gold -= cost; this.spent += cost; this.tier++; sfx('coin');
+                    for(let i=0; i<20; i++) parts.push(new Particle(this.x, this.y-20, '#facc15', 3, 30));
+                    
+                    if(branch) {
+                        this.branch = branch; let s = BRANCHES[this.type][branch];
+                        this.range = s.r; this.cd = s.cd || this.cd; this.dmg = s.dmg || this.dmg;
+                    } else {
+                        this.range += 10; this.dmg = Math.floor(this.dmg * 1.5);
+                    }
+                    
+                    if(this.type === TOWER.BARRACKS && !this.branch) {
+                        this.soldiers.forEach(s => { s.maxHp = 50+40*this.tier; s.hp = s.maxHp; s.dmg = 5+5*this.tier; s.state='MOVE'; });
+                    } else if(this.type === TOWER.BARRACKS && this.branch) {
+                        this.soldiers = []; // Respawn branch specific
+                        for(let i=0; i<3; i++) this.soldiers.push(new Soldier(this, this.x, this.y));
+                    }
+                    return true;
+                }
+                return false;
+            }
+
+            update() {
+                if(this.anim > 0) this.anim--;
+                if(this.type === TOWER.BARRACKS || this.type === 'guards' || this.type === 'archers' || this.type === 'titan' || this.type === 'dragon') {
+                    if(frames % 240 === 0 && !this.branch) { // Basic respawn
+                        let d = this.soldiers.find(s => s.state==='DEAD' && !s.isSkel);
+                        if(d) { d.hp = d.maxHp; d.state='MOVE'; d.x=this.x; d.y=this.y; }
+                    } else if(frames % 120 === 0 && this.branch) { // Faster respawn for T4
+                        let d = this.soldiers.find(s => s.state==='DEAD' && !s.isSkel);
+                        if(d) { d.hp = d.maxHp; d.state='MOVE'; d.x=this.x; d.y=this.y; d.revived=false; }
+                    }
+                    this.soldiers.forEach(s => s.update());
+                } else {
+                    if(this.cdTimer > 0) this.cdTimer--;
+                    
+                    // Death Ray logic
+                    if(this.branch === 'A' && this.type === TOWER.MAGE) {
+                        if(this.beamTgt && (this.beamTgt.hp<=0 || dist(this.x, this.y, this.beamTgt.px, this.beamTgt.py)>this.range)) {
+                            this.beamTgt = null; this.beamDmg = this.dmg; // Reset
+                        }
+                        if(!this.beamTgt) {
+                            this.beamTgt = enemies.find(e => dist(this.x, this.y, e.px, e.py) <= this.range);
+                            this.beamDmg = this.dmg;
+                        }
+                        if(this.beamTgt && frames%5===0) {
+                            sfx('magic', 2);
+                            this.beamTgt.takeDmg(this.beamDmg, 'magic');
+                            this.beamDmg *= 1.1; // Ramp up!
+                            this.anim = 5;
+                        }
+                        return;
+                    }
+
+                    if(this.cdTimer <= 0) {
+                        let tgt = null, maxP = -1;
+                        for(let e of enemies) {
+                            if((this.type === TOWER.CANNON && !this.branch && e.fly)) continue; // Basic cannon can't hit flying
+                            if(dist(this.x, this.y, e.px, e.py) <= this.range) {
+                                let p = e.pIdx + (1-dist(e.x,e.y,waypoints[e.pIdx]?.x,waypoints[e.pIdx]?.y)/64);
+                                if(p > maxP) { maxP=p; tgt=e; }
+                            }
+                        }
+                        if(tgt) {
+                            this.anim = 15;
+                            let pType = this.type===TOWER.ARCHER?'phys':(this.type===TOWER.MAGE?'magic':'aoe');
+                            if(this.branch === 'A' && this.type === TOWER.CANNON) pType = 'missile';
+                            if(this.branch === 'B' && this.type === TOWER.CANNON) pType = 'lightning';
+                            
+                            sfx(this.type===TOWER.ARCHER?(this.branch==='B'?'gun':'arrow'):(this.type===TOWER.MAGE?'magic':'cannon'));
+                            
+                            let p = new Projectile(this.x, this.y-25, tgt, this.dmg, pType, this);
+                            projs.push(p);
+                            if(pType === 'lightning') { p.hit(); projs.pop(); } // Instahit
+                            this.cdTimer = this.cd;
+                        }
+                    }
+                }
+            }
+
+            draw(c) {
+                let x = this.x, y = this.y, t = this.tier;
+                drawShadow(c, x, y+20, 20, 10);
+                
+                // Base
+                c.fillStyle = '#4b5563'; c.fillRect(x-20, y-10-t*5, 40, 20+t*5);
+                c.fillStyle = '#374151'; c.fillRect(x-18, y-10-t*5, 36, 20+t*5); // Inner brick
+                
+                // Tower Specifics
+                if(this.type === TOWER.ARCHER) {
+                    // Wood structure
+                    c.fillStyle = '#8b5a2b'; c.fillRect(x-15, y-20-t*8, 30, 20);
+                    if(this.branch === 'A') { // Ranger (Leafy)
+                        c.fillStyle = '#15803d'; c.beginPath(); c.moveTo(x, y-40-t*8); c.lineTo(x-20, y-20-t*8); c.lineTo(x+20, y-20-t*8); c.fill();
+                        // Ranger figure
+                        c.fillStyle = '#16a34a'; c.fillRect(x-5, y-30-t*8, 10, 10); // Hood
+                    } else if(this.branch === 'B') { // Musketeer
+                        c.fillStyle = '#444'; c.fillRect(x-15, y-25-t*8, 30, 5); // Steel rim
+                        c.fillStyle = '#dc2626'; c.fillRect(x-4, y-30-t*8, 8, 8); // Red coat
+                        if(this.anim>0) { c.fillStyle='#fff'; c.beginPath(); c.arc(x+(x<CANVAS_W/2?15:-15), y-30-t*8, 10, 0, Math.PI*2); c.fill(); } // Muzzle flash
+                    } else {
+                        c.fillStyle = '#991b1b'; c.beginPath(); c.moveTo(x, y-30-t*8); c.lineTo(x-18, y-20-t*8); c.lineTo(x+18, y-20-t*8); c.fill();
+                        c.fillStyle = '#eab308'; c.fillRect(x-4, y-26-t*8, 8, 8); // Bowman
+                    }
+                } else if(this.type === TOWER.MAGE) {
+                    if(this.branch === 'B') { // Necro
+                        c.fillStyle = '#1e1b4b'; c.fillRect(x-15, y-25-t*8, 30, 25);
+                        c.fillStyle = '#8b5cf6'; c.beginPath(); c.arc(x, y-30-t*8, 8, 0, Math.PI*2); c.fill();
+                    } else {
+                        c.fillStyle = '#111827'; c.beginPath(); c.moveTo(x-20, y-10-t*5); c.lineTo(x-15, y-30-t*8); c.lineTo(x+15, y-30-t*8); c.lineTo(x+20, y-10-t*5); c.fill();
+                        // Crystal
+                        let cy = y-35-t*8 + Math.sin(frames/10)*3;
+                        c.fillStyle = this.branch==='A' ? '#ef4444' : '#a855f7';
+                        c.beginPath(); c.moveTo(x, cy-10); c.lineTo(x-6, cy); c.lineTo(x, cy+10); c.lineTo(x+6, cy); c.fill();
+                        c.shadowColor = c.fillStyle; c.shadowBlur = 15; c.fill(); c.shadowBlur = 0;
+                        
+                        // Death Ray Beam
+                        if(this.branch === 'A' && this.beamTgt) {
+                            c.strokeStyle = `rgba(239, 68, 68, ${0.5 + Math.random()*0.5})`; c.lineWidth = 3 + Math.random()*4;
+                            c.beginPath(); c.moveTo(x, cy); c.lineTo(this.beamTgt.px, this.beamTgt.py); c.stroke();
+                        }
+                    }
+                } else if(this.type === TOWER.CANNON) {
+                    c.fillStyle = '#1f2937'; c.beginPath(); c.arc(x, y-15-t*5, 18, 0, Math.PI*2); c.fill();
+                    if(this.branch === 'A') { // Missile
+                        c.fillStyle = '#374151'; c.fillRect(x-10, y-30-t*5, 20, 15); // Radar
+                        if(this.anim>0) { c.fillStyle='#f97316'; c.beginPath(); c.arc(x, y-30-t*5, 15, 0, Math.PI*2); c.fill(); }
+                    } else if(this.branch === 'B') { // Tesla
+                        c.fillStyle = '#7dd3fc'; c.fillRect(x-2, y-35-t*5, 4, 20); // Coil
+                        c.beginPath(); c.arc(x, y-35-t*5, 6, 0, Math.PI*2); c.fill();
+                        if(frames%10<5) { c.strokeStyle='#fff'; c.beginPath(); c.moveTo(x, y-35-t*5); c.lineTo(x+rand(-10,10), y-45-t*5); c.stroke(); }
+                    } else { // Basic Cannon Barrel (Recoil)
+                        c.fillStyle = '#000';
+                        c.save(); c.translate(x, y-15-t*5); 
+                        let ang = projs.length && projs[projs.length-1].tw===this ? Math.atan2(projs[projs.length-1].ty - y, projs[projs.length-1].tx - x) : -Math.PI/2;
+                        c.rotate(ang);
+                        let reco = this.anim>0 ? -5 : 0;
+                        c.fillRect(reco, -6, 20, 12);
+                        if(this.anim>10) { c.fillStyle='#f97316'; c.beginPath(); c.arc(20+reco, 0, 10, 0, Math.PI*2); c.fill(); }
+                        c.restore();
+                    }
+                } else if(this.type === TOWER.BARRACKS) {
+                    c.fillStyle = '#78350f'; c.fillRect(x-18, y-20-t*5, 36, 10); // Roof
+                    c.fillStyle = '#ef4444'; c.fillRect(x-5, y-30-t*5, 10, 10); // Flag
+                    // Rally Point Marker if selected
+                    if(selCell && selCell.c === this.c && selCell.r === this.r) {
+                        c.fillStyle = 'rgba(59, 130, 246, 0.5)'; c.beginPath(); c.arc(this.rallyX, this.rallyY, 15, 0, Math.PI*2); c.fill();
+                        c.strokeStyle = '#fff'; c.beginPath(); c.moveTo(this.rallyX-5, this.rallyY); c.lineTo(this.rallyX+5, this.rallyY); c.moveTo(this.rallyX, this.rallyY-5); c.lineTo(this.rallyX, this.rallyY+5); c.stroke();
+                    }
+                    this.soldiers.forEach(s => s.draw(c));
+                }
+
+                // Tier indicator dots
+                c.fillStyle = '#fff';
+                for(let i=0; i<t; i++) { c.beginPath(); c.arc(x - (t*4)/2 + i*5 + 2, y + 10, 2, 0, Math.PI*2); c.fill(); }
+            }
+        }
+
+        // ==========================================
+        // 6. GAME LOGIC & LOOP
+        // ==========================================
+        function spawnEnemy() {
+            let type = ENEMY.LIGHT, r = Math.random();
+            if(wave > 2 && r < 0.35) type = ENEMY.HEAVY;
+            if(wave > 3 && r > 0.7) type = ENEMY.MAGIC;
+            if(wave > 4 && r > 0.4 && r < 0.6) type = ENEMY.FLYING;
+            if(wave % 5 === 0 && waveData.spawned === waveData.toSpawn - 1) type = ENEMY.BOSS; // Boss is always last in mod 5 waves
+
+            let baseHp = 40, spd = 1.0, rw = 5 + Math.floor(wave*0.5), rad = 14, col = '#84cc16';
+            if(type === ENEMY.HEAVY) { baseHp*=2.5; spd*=0.7; col='#475569'; rad=18; rw*=1.5; }
+            else if(type === ENEMY.MAGIC) { baseHp*=1.2; spd*=0.9; col='#c084fc'; rw*=1.2; }
+            else if(type === ENEMY.FLYING) { baseHp*=0.7; spd*=1.3; col='#94a3b8'; rad=12; }
+            else if(type === ENEMY.BOSS) { baseHp*=20; spd*=0.45; col='#7f1d1d'; rad=28; rw*=20; document.getElementById('boss-hp-container').classList.remove('hidden'); document.getElementById('boss-name').innerText = `WAVE ${wave} BOSS`; addShake(30); }
+            
+            rw = Math.floor(rw);
+            let mobHp = baseHp * Math.pow(1.15, wave - 1);
+            if(wave <= 3) mobHp *= 0.6; // Weaken early waves
+            else if(wave === resumedWave) mobHp *= 0.3; // Much weaker enemies on first resume wave
+            enemies.push(new Enemy(type, mobHp, spd, rw, rad, col));
+        }
+
+        function startWave() {
+            waveData.on = true; waveData.swarm = false;
+            waveData.toSpawn = 10 + wave * 3;
+            if(wave <= 3) waveData.toSpawn = Math.floor(waveData.toSpawn * 0.6); // Fewer enemies early
+            else if(wave === resumedWave) waveData.toSpawn = Math.floor(waveData.toSpawn * 0.3); // Easier first wave on resume
+            waveData.spawned = 0; waveData.spawnT = 0;
+            updateHUD();
+        }
+
+        function forceNextWave() {
+            if(!waveData.on) {
+                let bonus = Math.floor(waveData.t / 30);
+                if(bonus > 0) { gold += bonus; texts.push(new FloatingText(CANVAS_W/2, 150, `+${bonus} EARLY BONUS`, '#facc15', 24, 60)); }
+                startWave();
+            }
+        }
+        
+        function callSwarm() {
+            if(waveData.on && !waveData.swarm) {
+                waveData.swarm = true; waveData.swarmT = 300; // 5 seconds of 60fps
+                texts.push(new FloatingText(CANVAS_W/2, 200, 'SWARM INCOMING!', '#dc2626', 30, 60));
+                document.getElementById('btn-swarm').classList.add('hidden');
+                sfx('cannon', 0.5);
+            }
+        }
+
+        function updateGame() {
+            if(screenShake > 0) screenShake--;
+            
+            // Swarm Logic
+            if(waveData.swarm) { waveData.swarmT--; if(waveData.swarmT<=0) waveData.swarm = false; }
+
+            if(!waveData.on) {
+                if(autoSwarm && waveData.t > 0) {
+                    waveData.t = 0; startWave(); callSwarm();
+                } else {
+                    waveData.t--;
+                    if(waveData.t <= 0) startWave();
+                }
+            } else {
+                if(waveData.spawned < waveData.toSpawn) {
+                    waveData.spawnT--;
+                    if(waveData.spawnT <= 0) {
+                        spawnEnemy(); waveData.spawned++;
+                        waveData.spawnT = Math.max(10, 60 - wave) / (waveData.swarm ? 3 : 1);
+                    }
+                } else if(enemies.length === 0) {
+                    wave++; 
+                    if (resumedWave !== null) resumedWave = null;
+                    if (gameMode === 'ROGUELIKE') {
+                        waveData.on = false; waveData.t = 300;
+                        metaGold += wave * 2; saveMeta();
+                        updateHUD();
+                        if (wave > 10) {
+                            alert("YOU WON THE EXPEDITION!");
+                            backToMenu();
+                        } else {
+                            showBoons(); // Pauses and shows boons
+                        }
+                    } else {
+                        let hs = Store.load('hs') || 0; if(wave > hs) Store.save('hs', wave);
+                        if(wave > 20 && wave % 10 === 1) availableSlots++;
+                        metaGold += wave * 2; saveMeta();
+                        waveData.on = false; waveData.t = 300; // 5 sec prep
+                        updateHUD();
+                    }
+                }
+            }
+
+            towers.forEach(t => t.update());
+            if(heroUnit) heroUnit.update();
+            for(let i=enemies.length-1; i>=0; i--) { enemies[i].update(); if(enemies[i].hp<=0) enemies.splice(i,1); }
+            for(let i=projs.length-1; i>=0; i--) { projs[i].update(); if(!projs[i].active) projs.splice(i,1); }
+            for(let i=parts.length-1; i>=0; i--) { parts[i].update(); if(parts[i].life<=0) parts.splice(i,1); }
+            for(let i=texts.length-1; i>=0; i--) { texts[i].update(); if(texts[i].life<=0) texts.splice(i,1); }
+            for(let i=decals.length-1; i>=0; i--) { decals[i].update(); if(decals[i].life<=0) decals.splice(i,1); }
+            
+            if(hp <= 0 && state !== 'GAMEOVER') {
+                state = 'GAMEOVER'; let hs = Store.load('hs') || 0; if(wave > hs) Store.save('hs', wave);
+                document.getElementById('ring-menu').innerHTML = ''; document.getElementById('boss-hp-container').classList.add('hidden');
+            }
+            if(frames % 10 === 0) updateHUD();
+        }
+
+        function drawGame() {
+            ctx.clearRect(0,0,CANVAS_W,CANVAS_H);
+            if(state === 'MENU') return;
+            
+            ctx.save();
+            if(screenShake > 0) ctx.translate(rand(-screenShake,screenShake), rand(-screenShake,screenShake));
+            
+            if(map) ctx.drawImage(bgCanvas, 0, 0); // Render static background
+            
+            if(state === 'PLAYING' || state === 'GAMEOVER') {
+                scenery.forEach(s => {
+                    if(s.type === 1) {
+                        let bob = Math.sin(frames*0.05 + s.seed)*1.5;
+                        ctx.fillStyle = '#2c4a16'; ctx.beginPath(); ctx.arc(s.x, s.y, 14, 0, Math.PI*2); ctx.fill();
+                        ctx.fillStyle = '#3a5e1e'; ctx.beginPath(); ctx.arc(s.x-6, s.y-6 - bob, 10, 0, Math.PI*2); ctx.fill();
+                        ctx.beginPath(); ctx.arc(s.x+6, s.y-4 - bob, 9, 0, Math.PI*2); ctx.fill();
+                    } else if(s.type === 2) {
+                        ctx.fillStyle = '#4a4e54'; ctx.beginPath(); ctx.arc(s.x, s.y, 8, 0, Math.PI*2); ctx.fill();
+                        ctx.fillStyle = '#a8b39b'; ctx.beginPath(); ctx.arc(s.x-2, s.y-2, 4, 0, Math.PI*2); ctx.fill();
+                    } else {
+                        ctx.fillStyle = '#fff';
+                        for(let i=0; i<4; i++) { ctx.beginPath(); ctx.arc(s.x + Math.cos(i*Math.PI/2)*4, s.y + Math.sin(i*Math.PI/2)*4, 2.5, 0, Math.PI*2); ctx.fill(); }
+                        ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.arc(s.x, s.y, 2, 0, Math.PI*2); ctx.fill();
+                    }
+                });
+                
+                // Draw slot runes
+                for(let r=0; r<ROWS; r++) {
+                    for(let c=0; c<COLS; c++) {
+                        if(map.grid[r][c] === CELL.SLOT && !towers.find(t=>t.c===c && t.r===r)) {
+                            let cx = c*TILE_SIZE+32, cy = r*TILE_SIZE+32;
+                            ctx.strokeStyle = `rgba(218, 165, 32, ${0.3 + Math.sin(frames*0.05)*0.2})`;
+                            ctx.lineWidth = 2;
+                            ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI*2); ctx.stroke();
+                            ctx.beginPath(); ctx.moveTo(cx-4, cy-4); ctx.lineTo(cx+4, cy+4); ctx.moveTo(cx+4, cy-4); ctx.lineTo(cx-4, cy+4); ctx.stroke();
+                        }
+                    }
+                }
+
+                decals.forEach(d => d.draw(ctx));
+                // Sort entities by Y for pseudo-3D depth
+                let ents = [...towers, ...enemies];
+                if(heroUnit) ents.push(heroUnit);
+                ents.sort((a,b) => (a.py||a.y) - (b.py||b.y));
+                ents.forEach(e => e.draw(ctx));
+                
+                projs.forEach(p => p.draw(ctx));
+                parts.forEach(p => p.draw(ctx));
+                texts.forEach(t => t.draw(ctx));
+
+                // Selection Highlight & Range
+                if(selCell) {
+                    let cx = selCell.c*TILE_SIZE, cy = selCell.r*TILE_SIZE;
+                    ctx.strokeStyle = 'rgba(250, 204, 21, 0.8)'; ctx.lineWidth = 3; ctx.strokeRect(cx, cy, TILE_SIZE, TILE_SIZE);
+                    let t = towers.find(tw => tw.c===selCell.c && tw.r===selCell.r);
+                    if(t) { ctx.fillStyle='rgba(255,255,255,0.1)'; ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.beginPath(); ctx.arc(t.x, t.y, t.range, 0, Math.PI*2); ctx.fill(); ctx.stroke(); }
+                }
+                
+                if(rallyTower) {
+                    ctx.fillStyle = 'rgba(59,130,246,0.2)'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
+                    ctx.fillStyle = '#fff'; ctx.font = 'bold 30px sans-serif'; ctx.textAlign = 'center'; ctx.fillText("CLICK PATH TO SET RALLY POINT", CANVAS_W/2, 60);
+                }
+
+                if(state === 'GAMEOVER') {
+                    ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
+                    ctx.fillStyle = '#ef4444'; ctx.font = 'bold 80px sans-serif'; ctx.textAlign = 'center'; ctx.fillText("KINGDOM FALLEN", CANVAS_W/2, CANVAS_H/2 - 20);
+                    ctx.fillStyle = '#fff'; ctx.font = '30px sans-serif'; ctx.fillText(`Survive until Wave ${wave}`, CANVAS_W/2, CANVAS_H/2 + 40);
+                    ctx.fillText("Click anywhere to return", CANVAS_W/2, CANVAS_H/2 + 100);
+                }
+            } else if(state === 'EDITOR') {
+                ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                for(let r=0; r<ROWS; r++) for(let c=0; c<COLS; c++) ctx.strokeRect(c*TILE_SIZE, r*TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            }
+            
+            ctx.restore();
+        }
+
+        let lastT = 0;
+        function loop(t) {
+            requestAnimationFrame(loop);
+            let dt = t - lastT; if(dt < 16) return; lastT = t;
+            if(state === 'PLAYING' && !paused) {
+                for(let s=0; s<speed; s++) { updateGame(); frames++; }
+            }
+            drawGame();
+        }
+
+        // ==========================================
+        // 7. UI & INTERACTION
+        // ==========================================
+        function extractGold() {
+            if(gold >= 400 && extractedGold < 3000) {
+                gold -= 400;
+                let amt = Math.min(200, 3000 - extractedGold);
+                extractedGold += amt;
+                metaGold += amt;
+                saveMeta(); loadMeta(); updateHUD();
+                sfx('coin');
+                texts.push(new FloatingText(CANVAS_W/2, 100, `+${amt} META GOLD`, '#facc15', 30, 60));
+            }
+        }
+
+        function updateHUD() {
+            document.getElementById('hud-hp').innerText = hp;
+            document.getElementById('hud-gold').innerText = Math.floor(gold);
+            document.getElementById('hud-wave').innerText = wave;
+            document.getElementById('btn-extract-gold').innerText = `💰 EXTRACT (${extractedGold}/3000)`;
+            
+            let btnSlot = document.getElementById('btn-add-slot');
+            if(availableSlots > 0 || addSlotMode) {
+                btnSlot.style.display = 'block';
+                btnSlot.innerText = addSlotMode ? '🔲 CANCEL PLACEMENT' : `🏗️ ADD SLOT (${availableSlots})`;
+                btnSlot.style.background = addSlotMode ? '#dc2626' : '#8b5cf6';
+            } else {
+                btnSlot.style.display = 'none';
+            }
+            
+            
+            
+            
+            let btnNext = document.getElementById('btn-next-wave');
+            let btnSwarm = document.getElementById('btn-swarm');
+            if(waveData.on || enemies.length > 0) {
+                btnNext.classList.add('hidden');
+                if(waveData.on && !waveData.swarm && !autoSwarm) btnSwarm.classList.remove('hidden');
+                else btnSwarm.classList.add('hidden');
+            } else {
+                if(!autoSwarm) {
+                    btnNext.classList.remove('hidden'); btnSwarm.classList.add('hidden');
+                    btnNext.innerText = `⚠️ NEXT WAVE (${Math.ceil(waveData.t/60)}s)`;
+                } else {
+                    btnNext.classList.add('hidden'); btnSwarm.classList.add('hidden');
+                }
+            }
+        }
+
+        function updateWaypoints() {
+            let st = null, en = null;
+            for(let r=0; r<ROWS; r++) for(let c=0; c<COLS; c++) {
+                if(map.grid[r][c]===CELL.START) st={x:c,y:r};
+                if(map.grid[r][c]===CELL.END) en={x:c,y:r};
+            }
+            if(!st || !en) { waypoints = []; return; }
+            let q = [st], cameFrom = {}; cameFrom[`${st.x},${st.y}`] = null;
+            while(q.length>0) {
+                let cur = q.shift(); if(cur.x===en.x && cur.y===en.y) break;
+                [{x:cur.x+1,y:cur.y},{x:cur.x-1,y:cur.y},{x:cur.x,y:cur.y+1},{x:cur.x,y:cur.y-1}].forEach(n => {
+                    if(n.x>=0 && n.x<COLS && n.y>=0 && n.y<ROWS && [CELL.PATH,CELL.START,CELL.END].includes(map.grid[n.y][n.x]) && !cameFrom.hasOwnProperty(`${n.x},${n.y}`)) {
+                        cameFrom[`${n.x},${n.y}`] = cur; q.push(n);
+                    }
+                });
+            }
+            waypoints = []; let curr = en;
+            while(curr) { waypoints.push({x:curr.x*TILE_SIZE+32, y:curr.y*TILE_SIZE+32}); curr=cameFrom[`${curr.x},${curr.y}`]; }
+            waypoints.reverse();
+        }
+
+        function startGame(opts) {
+            let m = Store.load('map');
+            if(opts.mode === 'ROGUELIKE') {
+                gameMode = 'ROGUELIKE';
+                map = generateRoguelikeMap();
+                let elIdx = Math.floor(Math.random() * ELEMENTS_DB.length);
+                currentElement = ELEMENTS_DB[elIdx];
+                activeBoons = {};
+                // rlInventory persists across runs
+                document.getElementById('element-display').classList.remove('hidden');
+                document.getElementById('element-display').innerText = `[${currentElement.n}]`;
+                document.getElementById('element-display').style.color = currentElement.col;
+                document.getElementById('element-display').style.borderColor = currentElement.col;
+            } else {
+                gameMode = opts.defaultMap ? 'DEFAULT' : 'CUSTOM';
+                document.getElementById('element-display').classList.add('hidden');
+            }
+            // ONLY load the custom map if we explicitly click "Start Custom Map" or if it is saved in resumeMap for custom runs.
+            // If opts.defaultMap is true, ALWAYS force the default map.
+            if(gameMode !== 'ROGUELIKE') {
+                map = (!opts.defaultMap && m) ? m : JSON.parse(JSON.stringify(defaultMap));
+            }
+            
+            let st = null, en = null;
+            for(let r=0; r<ROWS; r++) for(let c=0; c<COLS; c++) {
+                if(map.grid[r][c]===CELL.START) st={x:c,y:r};
+                if(map.grid[r][c]===CELL.END) en={x:c,y:r};
+            }
+            // If the custom map is invalid or somehow has no start/end, fallback to default to prevent crash
+            if(!st || !en) {
+                if(gameMode === 'ROGUELIKE') map = generateRoguelikeMap();
+                else map = JSON.parse(JSON.stringify(defaultMap));
+                for(let r=0; r<ROWS; r++) for(let c=0; c<COLS; c++) {
+                    if(map.grid[r][c]===CELL.START) st={x:c,y:r};
+                    if(map.grid[r][c]===CELL.END) en={x:c,y:r};
+                }
+            }
+            scenery = [];
+            for(let r=0; r<ROWS; r++) {
+                for(let c=0; c<COLS; c++) {
+                    if(map.grid[r][c] === CELL.EMPTY) {
+                        if(Math.random() < 0.25) {
+                            scenery.push({
+                                x: c*TILE_SIZE + rand(10, 54),
+                                y: r*TILE_SIZE + rand(10, 54),
+                                type: Math.floor(rand(1, 4)),
+                                seed: rand(0, 100)
+                            });
+                        }
+                    }
+                }
+            }
+            enemies=[]; towers=[]; projs=[]; parts=[]; texts=[]; decals=[];
+            heroUnit = new HeroUnit(activeHero, heroes[activeHero].level);
+            
+            if(gameMode === 'ROGUELIKE') {
+                wave = 1;
+                resumedWave = null;
+                gold = 500;
+                availableSlots = 0;
+            } else if(opts.resume) {
+                let hs = Store.load('hs') || 1;
+                wave = hs;
+                resumedWave = wave;
+                gold = wave > 1 ? wave * 1000 : 350;
+                availableSlots = Math.max(0, Math.floor((wave - 11) / 10));
+                let savedMap = Store.load('resumeMap');
+                // Only load savedMap if it matches the mode we chose
+                if (savedMap) {
+                                        if (opts.defaultMap) {
+                        map = JSON.parse(JSON.stringify(defaultMap));
+                    } else {
+                        // Custom map mode: just load the saved custom map
+                        map = savedMap;
+                    }
+                } else {
+                    map = (!opts.defaultMap && m) ? m : JSON.parse(JSON.stringify(defaultMap));
+                }
+            } else {
+                wave = 1;
+                resumedWave = null;
+                gold = 350;
+                availableSlots = 0;
+                                Store.remove('resumeMap'); // Force clear saved map for fresh runs
+                // rlInventory persists across runs
+            }
+            
+            if (gameMode === 'DEFAULT') {
+                let pSlots = Store.load('pSlots') || [];
+                pSlots.forEach(s => {
+                    if (map.grid[s.r] && map.grid[s.r][s.c] === 0) { // CELL.EMPTY
+                        map.grid[s.r][s.c] = 2; // CELL.SLOT
+                    }
+                });
+            }
+            
+            // Mark the map with its type so we don't mix them up on resume
+            map.isDefault = opts.defaultMap;
+            
+            // We must update waypoints AFTER we fully determine the final map
+            updateWaypoints();
+
+            hp = 20; frames = 0; speed = 1; paused = false; autoSwarm = false; extractedGold = 0;
+            Store.save('resumeMap', map);
+            let btnAuto = document.getElementById('btn-auto-wave');
+            if(btnAuto) { btnAuto.innerText = '🤖 AUTO SWARM: OFF'; btnAuto.style.background = ''; btnAuto.style.color = ''; }
+            selCell = null; rallyTower = null; waveData = { on:false, t:180, toSpawn:0, spawnT:0, spawned:0, swarm:false, swarmT:0 };
+            
+            document.getElementById('ui-main-menu').classList.add('hidden');
+            document.getElementById('ui-editor').classList.add('hidden');
+            document.getElementById('ui-game').classList.remove('hidden');
+            document.getElementById('ring-menu').innerHTML = '';
+            document.getElementById('hud-speed').innerText = '1x';
+            document.getElementById('boss-hp-container').classList.add('hidden');
+            
+                        renderTerrain(); state = 'PLAYING'; updateHUD(); 
+            renderDashboard(); 
+            document.getElementById('dashboard').style.display = 'flex';
+            if (gameMode === 'ROGUELIKE') { 
+                document.getElementById('btn-add-slot').style.display = 'none'; 
+            } else { 
+                document.getElementById('btn-add-slot').style.display = ''; 
+            }
+        }
+
+        // Ring Menu Logic
+        function closeRing() { document.getElementById('ring-menu').innerHTML = ''; selCell = null; }
+        
+        function actionBuild(c, r, type) {
+            let s = TOWER_STATS[type];
+            if(gold >= s.cost) { gold-=s.cost; towers.push(new Tower(c,r,type)); sfx('build'); closeRing(); updateHUD(); }
+        }
+        
+        function actionUpg(t, branch) {
+            if(t.upgrade(branch)) { closeRing(); updateHUD(); }
+        }
+        
+        function actionSell(t) {
+            gold += Math.floor(t.spent * 0.7);
+            towers = towers.filter(x => x!==t);
+            if(t.type===TOWER.BARRACKS) t.soldiers.forEach(s => { if(s.target) s.target.blocked=false; });
+            sfx('coin'); closeRing(); updateHUD();
+        }
+
+        function createRingBtn(icon, cost, desc, ang, onclick, isSell=false, isRally=false) {
+            let btn = document.createElement('button'); btn.className = `ring-btn ${isSell?'sell':(isRally?'rally':'')}`;
+            btn.innerHTML = `${icon}<br><span class="cost">${cost?'$'+cost:''}</span><span class="desc">${desc}</span>`;
+            let r = 70; btn.style.transform = `translate(calc(-50% + ${Math.cos(ang)*r}px), calc(-50% + ${Math.sin(ang)*r}px))`;
+            btn.onclick = onclick;
+            if(cost && !isSell && gold < cost) btn.classList.add('disabled');
+            return btn;
+        }
+
+        function openRing(c, r, tw) {
+            let rm = document.getElementById('ring-menu'); rm.innerHTML = '';
+            rm.style.left = (c*TILE_SIZE + 32)/CANVAS_W*100 + '%'; rm.style.top = (r*TILE_SIZE + 32)/CANVAS_H*100 + '%';
+            
+            if(!tw) {
+                let types = [TOWER.ARCHER, TOWER.MAGE, TOWER.CANNON, TOWER.BARRACKS];
+                let icons = ['🏹','🔮','💣','🛡️'];
+                types.forEach((type, i) => {
+                    let ang = -Math.PI/2 + (Math.PI*2/4)*i;
+                    rm.appendChild(createRingBtn(icons[i], TOWER_STATS[type].cost, TOWER_STATS[type].n, ang, () => actionBuild(c,r,type)));
+                });
+            } else {
+                rm.appendChild(createRingBtn('💵', Math.floor(tw.spent*0.7), 'SELL', Math.PI, () => actionSell(tw), true));
+                
+                if(tw.type === TOWER.BARRACKS) {
+                    rm.appendChild(createRingBtn('🚩', null, 'RALLY', Math.PI/2, () => { rallyTower=tw; rm.innerHTML=''; }, false, true));
+                }
+
+                if(tw.tier < 3) {
+                    let cst = Math.floor(TOWER_STATS[tw.type].cost * (tw.tier+1) * 0.8);
+                    rm.appendChild(createRingBtn('⬆️', cst, 'UPGRADE', 0, () => actionUpg(tw)));
+                } else if(tw.tier === 3) {
+                    let bA = BRANCHES[tw.type].A, bB = BRANCHES[tw.type].B;
+                    rm.appendChild(createRingBtn(bA.n, bA.cost, bA.desc, -Math.PI/4, () => actionUpg(tw, 'A')));
+                    rm.appendChild(createRingBtn(bB.n, bB.cost, bB.desc, -3*Math.PI/4, () => actionUpg(tw, 'B')));
+                }
+            }
+        }
+
+        function handleTap(x, y) {
+            if(state === 'EDITOR') { handleEdit(x, y); return; }
+            if(state === 'GAMEOVER') { backToMenu(); return; }
+            if(state !== 'PLAYING') return;
+            
+            let cc = Math.floor(x/TILE_SIZE), rr = Math.floor(y/TILE_SIZE);
+            if (itemPlacementMode && cc>=0 && cc<COLS && rr>=0 && rr<ROWS) {
+                triggerTargetItem(cc, rr);
+                return;
+            }
+            
+            if(heroUnit) {
+                if(dist(x, y, heroUnit.x, heroUnit.y) < 30) {
+                    heroUnit.sel = !heroUnit.sel;
+                    if(heroUnit.sel) { selCell = null; rallyTower = null; closeRing(); sfx('click'); return; }
+                } else if(heroUnit.sel) {
+                    heroUnit.tgtX = x; heroUnit.tgtY = y;
+                    heroUnit.sel = false;
+                    parts.push(new Particle(x, y, '#3b82f6', 5, 20));
+                    sfx('click'); return;
+                }
+            }
+            
+            let c = Math.floor(x/TILE_SIZE), r = Math.floor(y/TILE_SIZE);
+            if(c>=0 && c<COLS && r>=0 && r<ROWS) {
+                if(addSlotMode) {
+                    if(map.grid[r][c] === CELL.EMPTY) {
+                        map.grid[r][c] = CELL.SLOT;
+                        availableSlots--;
+                        addSlotMode = false;
+                        Store.save('resumeMap', map);
+                        if(gameMode === 'DEFAULT') {
+                            let pSlots = Store.load('pSlots') || [];
+                            pSlots.push({r, c});
+                            Store.save('pSlots', pSlots);
+                        }
+                        renderTerrain();
+                        updateHUD();
+                        sfx('build');
+                    }
+                    return;
+                }
+                if(rallyTower) {
+                    if([CELL.PATH,CELL.START,CELL.END].includes(map.grid[r][c])) {
+                        rallyTower.rallyX = c*TILE_SIZE+32; rallyTower.rallyY = r*TILE_SIZE+32;
+                        rallyTower.soldiers.forEach(s => { s.state='MOVE'; if(s.target){s.target.blocked=false; s.target=null;} });
+                        rallyTower = null; sfx('build');
+                    }
+                    return;
+                }
+                
+                if(map.grid[r][c] === CELL.SLOT) {
+                    if(selCell && selCell.c===c && selCell.r===r) { closeRing(); return; } // Toggle off
+                    selCell = {c, r};
+                    openRing(c, r, towers.find(t => t.c===c && t.r===r));
+                } else closeRing();
+            }
+        }
+
+        // Editor
+        function openEditor() {
+            map = Store.load('map') || JSON.parse(JSON.stringify(defaultMap));
+            document.getElementById('ui-main-menu').classList.add('hidden');
+            document.getElementById('ui-editor').classList.remove('hidden');
+            bgCtx.clearRect(0,0,CANVAS_W,CANVAS_H); state = 'EDITOR'; renderTerrain();
+        }
+        function editorSetBrush(b, btn) { brush = b; document.querySelectorAll('.editor-bar button').forEach(x=>x.classList.remove('brush-active')); btn.classList.add('brush-active'); }
+        function handleEdit(x, y) {
+            let c = Math.floor(x/TILE_SIZE), r = Math.floor(y/TILE_SIZE);
+            if(c>=0 && c<COLS && r>=0 && r<ROWS) {
+                if(brush===CELL.START || brush===CELL.END) {
+                    for(let i=0;i<ROWS;i++) for(let j=0;j<COLS;j++) if(map.grid[i][j]===brush) map.grid[i][j]=CELL.EMPTY;
+                }
+                map.grid[r][c] = brush; 
+                if([CELL.EMPTY, CELL.PATH, CELL.START, CELL.END].includes(brush)) updateWaypoints();
+                renderTerrain();
+            }
+        }
+        function saveAndPlayCustom() {
+            let s=0, e=0; for(let i=0;i<ROWS;i++) for(let j=0;j<COLS;j++){ if(map.grid[i][j]===CELL.START) s++; if(map.grid[i][j]===CELL.END) e++; }
+            if(s!==1 || e!==1) { alert("Must have EXACTLY ONE Start (🔵) and ONE Base (🔴)"); return; }
+            Store.save('map', map); startGame({ defaultMap: false, resume: false });
+        }
+
+        function backToMenu() {
+            ['ui-editor', 'ui-game', 'boss-hp-container'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            document.getElementById('ui-main-menu').classList.remove('hidden');
+            document.getElementById('high-score-display').innerText = Store.load('hs') || 0;
+            state = 'MENU'; closeRing();
+        }
+
+        function toggleSpeed() { speed = speed===1?2:1; document.getElementById('hud-speed').innerText = speed+'x'; }
+        function togglePause() { paused = !paused; }
+        
+        function toggleAddSlot() {
+            if(availableSlots > 0 || addSlotMode) {
+                addSlotMode = !addSlotMode;
+                updateHUD();
+            }
+        }
+        
+        function useItem(item) {
+            if(items[item] > 0) {
+                items[item]--;
+                saveMeta();
+                if(item === 'dynamite') {
+                    enemies.forEach(e => e.takeDmg(1000, 'true', 'headshot'));
+                    sfx('hit'); addShake(50);
+                } else if(item === 'freeze') {
+                    enemies.forEach(e => e.stun = 300); // 5 sec stun
+                    sfx('build');
+                }
+                updateHUD();
+            }
+        }
+        
+        function toggleAuto() {
+            autoSwarm = !autoSwarm;
+            let btn = document.getElementById('btn-auto-wave');
+            if(autoSwarm) {
+                btn.innerText = '🤖 AUTO SWARM: ON';
+                btn.style.background = '#eab308';
+                btn.style.color = '#000';
+            } else {
+                btn.innerText = '🤖 AUTO SWARM: OFF';
+                btn.style.background = '';
+                btn.style.color = '';
+            }
+        }
+
+        function saveMeta() {
+            Store.save('metaGold', metaGold);
+            Store.save('metaGems', metaGems);
+            Store.save('items', items);
+            Store.save('heroes', heroes);
+            Store.save('activeHero', activeHero);
+            Store.save('heroSkins', equippedHeroSkins);
+            Store.save('unlockedHeroSkins', unlockedHeroSkins);
+        }
+        
+        function loadMeta() {
+            metaGold = Store.load('metaGold') || 0;
+            metaGems = Store.load('metaGems') || 0;
+            items = Store.load('items') || { dynamite: 0, freeze: 0, midas: 0 };
+            heroes = Store.load('heroes') || { archer: { unlocked: true, level: 1, xp: 0 }, paladin: { unlocked: false, level: 1, xp: 0 }, dragon: { unlocked: false, level: 1, xp: 0 } };
+            activeHero = Store.load('activeHero') || 'archer';
+            
+            let loadedHeroSkins = Store.load('heroSkins');
+            equippedHeroSkins = Object.assign({ archer: 'default', paladin: 'default', dragon: 'default' }, loadedHeroSkins || {});
+            
+            let loadedUnlocked = Store.load('unlockedHeroSkins');
+            unlockedHeroSkins = Object.assign({ 'archer:default': true, 'paladin:default': true, 'dragon:default': true }, loadedUnlocked || {});
+
+            document.getElementById('meta-gold-display').innerText = metaGold;
+            document.getElementById('meta-gems-display').innerText = metaGems;
+            document.getElementById('resume-wave-display').innerText = Store.load('hs') || 1;
+            
+            ['archer', 'paladin', 'dragon'].forEach(h => {
+                let el = document.getElementById('hero-'+h);
+                if(heroes[h].unlocked) {
+                    el.classList.remove('locked');
+                    let btn = document.getElementById('hero-'+h+'-btn');
+                    if(btn) btn.style.display = 'none';
+                    let lvlTxt = document.getElementById('hero-'+h+'-lvl');
+                    if(lvlTxt) { lvlTxt.classList.remove('hidden'); lvlTxt.innerText = 'LVL ' + heroes[h].level; }
+                }
+                el.classList.remove('active');
+            });
+            document.getElementById('hero-'+activeHero).classList.add('active');
+            document.getElementById('hero-active-name').innerText = activeHero;
+            let ah = heroes[activeHero];
+            document.getElementById('hero-active-lvl').innerText = ah.level;
+            document.getElementById('hero-upgrade-cost').innerText = Math.floor(100 * Math.pow(1.5, ah.level-1));
+            
+            renderHeroHallSkins();
+        }
+
+        function openHeroHall() { document.getElementById('ui-hero-hall').classList.remove('hidden'); loadMeta(); renderHeroHallSkins(); }
+        
+        function renderArmory() {
+            let html = '';
+            for(let k in ITEMS_DB) {
+                let it = ITEMS_DB[k];
+                let qty = rlInventory[k] || 0;
+                html += `<div class="item-card" style="border-color: #3b82f6;">
+                    <div style="font-size:2rem; text-align:center;">${it.icon}</div>
+                    <h3 style="text-align:center; margin: 5px 0;">${it.n}</h3>
+                    <div style="color:#aaa; font-size:0.8rem; margin-bottom:10px; text-align:center; height: 32px;">${it.desc}</div>
+                    <div style="text-align:center; font-weight:bold;">Owned: <span style="color:#22c55e;">${qty}</span></div>
+                    <div style="display:flex; gap: 5px; margin-top:10px;">
+                        <button onclick="buyRlItem('${k}', 'metagold')" style="padding:6px; font-size:0.9rem; flex:1;" class="btn-yellow">${it.gold} 💰</button>
+                        <button onclick="buyRlItem('${k}', 'gem')" style="padding:6px; font-size:0.9rem; flex:1;" class="btn-yellow">${it.gem} 💎</button>
+                    </div>
+                </div>`;
+            }
+            document.getElementById('armory-item-grid').innerHTML = html;
+        }
+        function openArmory() { 
+            document.getElementById('ui-armory').classList.remove('hidden'); 
+            loadMeta(); 
+            renderArmory(); loadMeta();
+        }
+
+        
+        function selectHero(h) {
+            if(heroes[h].unlocked) { activeHero = h; saveMeta(); loadMeta(); }
+        }
+        function upgradeHero() {
+            let ah = heroes[activeHero];
+            let cost = Math.floor(100 * Math.pow(1.5, ah.level-1));
+            if(metaGold >= cost) {
+                metaGold -= cost; ah.level++; saveMeta(); loadMeta(); sfx('build');
+            } else alert('Not enough gold!');
+        }
+        function buyHero(h) {
+            let cost = h==='paladin'?500:20;
+            let isGem = h==='dragon';
+            if((isGem && metaGems >= cost) || (!isGem && metaGold >= cost)) {
+                if(isGem) metaGems -= cost; else metaGold -= cost;
+                heroes[h].unlocked = true; activeHero = h;
+                saveMeta(); loadMeta(); sfx('build');
+            } else {
+                alert("Not enough resources!");
+            }
+        }
+        function buyItem(it) {
+            let cost = it==='dynamite'?2:3;
+            if(metaGems >= cost) {
+                metaGems -= cost; items[it]++;
+                saveMeta(); loadMeta(); sfx('build');
+            } else alert("Not enough gems!");
+        }
+
+        
+                function generateRoguelikeMap() {
+            while (true) {
+                let m = { grid: [] };
+                for(let r=0; r<ROWS; r++) m.grid[r] = new Array(COLS).fill(0);
+                let curR = 1, curC = 0;
+                m.grid[curR][curC] = 3; // START
+                let corners = 0, dir = 'R';
+                let failed = false;
+                while(curC < COLS-2 || corners < 5) {
+                    if (curC >= COLS-2 && corners < 5) {
+                        failed = true; break;
+                    }
+                    let len = Math.floor(Math.random() * 3) + 2;
+                    if(dir === 'R') {
+                        for(let i=0; i<len && curC < COLS-2; i++) { curC++; m.grid[curR][curC] = 1; }
+                        dir = Math.random() > 0.5 ? 'D' : 'U'; corners++;
+                    } else if(dir === 'D') {
+                        for(let i=0; i<len && curR < ROWS-2; i++) { curR++; m.grid[curR][curC] = 1; }
+                        dir = 'R'; corners++;
+                    } else if(dir === 'U') {
+                        for(let i=0; i<len && curR > 1; i++) { curR--; m.grid[curR][curC] = 1; }
+                        dir = 'R'; corners++;
+                    }
+                }
+                if (failed) continue;
+                curC++; m.grid[curR][curC] = 4; // END
+                let slots = 0;
+                for(let i=0; i<1000 && slots < 25; i++) {
+                    let r = Math.floor(Math.random()*(ROWS-2))+1;
+                    let c = Math.floor(Math.random()*(COLS-2))+1;
+                    if(m.grid[r][c] === 0) {
+                        let hasPath = false;
+                        for(let dr=-1; dr<=1; dr++) for(let dc=-1; dc<=1; dc++) {
+                            if(m.grid[r+dr] && m.grid[r+dr][c+dc] === 1) hasPath = true;
+                        }
+                        if(hasPath) { m.grid[r][c] = 2; slots++; }
+                    }
+                }
+                if(slots >= 20 && corners >= 5) return m;
+            }
+        }
+        
+        function renderDashboard() {
+            let html = '';
+            for(let k in ITEMS_DB) {
+                let it = ITEMS_DB[k];
+                let qty = rlInventory[k];
+                let active = itemPlacementMode === k ? 'active' : '';
+                html += `<div class="item-card ${active}" onclick="useRlItem('${k}')" style="display:flex; flex-direction:column; justify-content:center; align-items:center; padding: 4px 6px;">
+                    <div class="item-qty" style="top:-5px; right:-5px; font-size:11px;">${qty}</div>
+                    <div style="display:flex; align-items:center; gap:4px; margin-bottom:2px;">
+                        <span style="font-size:14px;">${it.icon}</span>
+                        <span style="font-size:11px; font-weight:bold;">${it.n}</span>
+                    </div>
+                    <div style="font-size:9px; color:#94a3b8; text-align:center; line-height:1.1; margin-bottom:2px;">${it.desc}</div>
+                    <div style="display:flex; gap:4px; width:100%; justify-content:space-between; margin-top:auto;">
+                        <button class="btn-buy gold" onclick="event.stopPropagation(); buyRlItem('${k}', 'gold')" style="flex:1; padding:2px 0; font-size:10px; border-radius:4px;">💰 ${it.gold}</button>
+                        <button class="btn-buy gem" onclick="event.stopPropagation(); buyRlItem('${k}', 'gem')" style="flex:1; padding:2px 0; font-size:10px; border-radius:4px; background:#2563eb; color:white;">💎 ${it.gem}</button>
+                    </div>
+                </div>`;
+            }
+            document.getElementById('item-tray').innerHTML = html;
+            
+            let h = heroes[activeHero];
+            document.getElementById('dash-hero-name').innerText = activeHero;
+            document.getElementById('dash-hero-icon').innerText = activeHero==='archer'?'🏹':(activeHero==='paladin'?'🛡️':'🐉');
+            document.getElementById('dash-hero-lvl').innerText = h.level;
+            document.getElementById('dash-hero-xp').style.width = (h.xp / (100 * h.level)) * 100 + '%';
+        }
+        
+        function buyRlItem(id, curr) {
+            let it = ITEMS_DB[id];
+            // Make sure the property exists on old saves
+            if(rlInventory[id] === undefined) rlInventory[id] = 0;
+            
+            if(curr === 'gold') {
+                if(gold >= it.gold) { gold -= it.gold; rlInventory[id]++; Store.save('rlInventory', rlInventory); sfx('coin'); } else alert('Not enough In-Game Gold!');
+            } else if(curr === 'metagold') {
+                if(metaGold >= it.gold) { metaGold -= it.gold; rlInventory[id]++; Store.save('rlInventory', rlInventory); saveMeta(); sfx('coin'); } else alert('Not enough Meta Gold!');
+            } else {
+                if(metaGems >= it.gem) { metaGems -= it.gem; rlInventory[id]++; Store.save('rlInventory', rlInventory); saveMeta(); sfx('build'); } else alert('Not enough Gems!');
+            }
+            updateHUD();
+            renderDashboard();
+            if(!document.getElementById('ui-armory').classList.contains('hidden')) {
+                renderArmory(); loadMeta();
+            }
+        }
+        
+        function useRlItem(id) {
+            if(rlInventory[id] <= 0) return;
+            let it = ITEMS_DB[id];
+            if(it.type === 'instant') {
+                rlInventory[id]--; Store.save('rlInventory', rlInventory);
+                triggerInstantItem(id);
+            } else {
+                itemPlacementMode = itemPlacementMode === id ? null : id;
+            }
+            renderDashboard();
+        }
+        
+        function triggerInstantItem(id) {
+            if(id === 'heal') {
+                let maxH = activeBoons.last_stand ? 1 : 20; hp = Math.min(maxH, hp + 10); sfx('build');
+            } else if(id === 'thunder') {
+                sfx('hit'); addShake(20);
+                let tgts = enemies.slice(0, 30);
+                tgts.forEach(e => {
+                    e.takeDmg(200, 'magic');
+                    // Chain
+                    let close = enemies.find(x => x!==e && dist(x.x, x.y, e.x, e.y) < 100);
+                    if(close) { close.takeDmg(200, 'magic'); }
+                });
+            } else if(id === 'nuke') {
+                sfx('hit'); addShake(100);
+                // Flash overlay
+                let flash = document.createElement('div');
+                flash.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:white;z-index:9999;pointer-events:none;transition:opacity 2s;';
+                document.body.appendChild(flash);
+                setTimeout(() => { flash.style.opacity = '0'; setTimeout(()=>flash.remove(), 2000); }, 100);
+                enemies = [];
+                // Kill summons
+                towers.forEach(t => { if(t.type === TOWER.BARRACKS || t.type === 'dragon' || t.type === 'titan' || t.type === 'archers' || t.type === 'guards') t.soldiers = []; });
+            }
+            updateHUD();
+        }
+        
+        function triggerTargetItem(c, r) {
+            let id = itemPlacementMode;
+            rlInventory[id]--; Store.save('rlInventory', rlInventory);
+            itemPlacementMode = null;
+            let x = c * TILE_SIZE + 32, y = r * TILE_SIZE + 32;
+            sfx('build');
+            
+            if(id === 'guards' || id === 'archers' || id === 'titan' || id === 'dragon') {
+                // Spawn a dummy tower that holds these units
+                let t = new Tower(c, r, TOWER.BARRACKS); 
+                t.type = id; 
+                t.soldiers = [];
+                let count = (id==='guards'||id==='archers') ? 10 : 1;
+                for(let i=0; i<count; i++) {
+                    let s = new Soldier(t, x, y);
+                    if(id==='guards') { s.maxHp=1000; s.hp=1000; s.dmg=100; s.range=30; }
+                    if(id==='archers') { s.maxHp=500; s.hp=500; s.dmg=50; s.range=200; s.type='ranged'; }
+                    if(id==='titan') { s.maxHp=10000; s.hp=10000; s.dmg=300; s.range=80; s.aoe=true; s.blockCap=999; }
+                    if(id==='dragon') { s.maxHp=10000; s.hp=10000; s.dmg=300; s.range=200; s.type='ranged'; s.blockCap=999; } // Blocks flying conceptually
+                    t.soldiers.push(s);
+                }
+                towers.push(t);
+            } else if (id === 'warp') {
+                enemies.forEach(e => {
+                    if(dist(e.x, e.y, x, y) < 300) {
+                        e.wp = 0; e.x = waypoints[0].x; e.y = waypoints[0].y;
+                    }
+                });
+            } else if (id === 'dynamite') {
+                addShake(30);
+                parts.push(new Particle(x, y, '#ef4444', 30, 40));
+                enemies.forEach(e => {
+                    if(dist(e.x, e.y, x, y) <= 200) e.takeDmg(1000, 'magic');
+                });
+            } else if (id === 'freeze') {
+                addShake(10);
+                parts.push(new Particle(x, y, '#93c5fd', 50, 40));
+                enemies.forEach(e => {
+                    if(dist(e.x, e.y, x, y) <= 300) {
+                        e.stun = 600; // 10 seconds (60 fps * 10)
+                    }
+                });
+            }
+            renderDashboard();
+        }
+        
+        function showBoons() {
+            paused = true;
+            document.getElementById('boon-container').classList.remove('hidden');
+            let pool = [...BOONS_DB].sort(()=>Math.random()-0.5).slice(0,3);
+            let html = '';
+            pool.forEach(b => {
+                html += `<div class="boon-card" onclick="selectBoon('${b.id}')">
+                    <h3 style="color:#facc15">${b.n}</h3>
+                    <p>${b.desc}</p>
+                </div>`;
+            });
+            document.getElementById('boon-cards').innerHTML = html;
+        }
+        
+        function selectBoon(id) {
+            activeBoons[id] = true;
+            document.getElementById('boon-container').classList.add('hidden');
+            sfx('build');
+            paused = false;
+            
+            // Apply immediate boons
+            if(id === 'tactical_reserves') { gold += 500; metaGems += 1; saveMeta(); updateHUD(); }
+            if(id === 'last_stand') { hp = 1; updateHUD(); }
+            
+            // Start next wave automatically
+            if(wave < 10) { startWave(); } else { /* boss */ startWave(); }
+        }
+
+        // Input Setup
+        window.onload = () => {
+            rasterizeAllHeroSkins();
+            loadMeta();
+            canvas = document.getElementById('gameCanvas'); ctx = canvas.getContext('2d');
+            bgCanvas = document.createElement('canvas'); bgCanvas.width=CANVAS_W; bgCanvas.height=CANVAS_H; bgCtx = bgCanvas.getContext('2d');
+            
+            let getPos = (e) => {
+                let r = canvas.getBoundingClientRect();
+                return { x: (e.clientX - r.left)*(CANVAS_W/r.width), y: (e.clientY - r.top)*(CANVAS_H/r.height) }; // using precise ratio for both
+            };
+            
+            canvas.addEventListener('pointerdown', (e) => { if(e.button!==0 && e.pointerType==='mouse') return; drawing=true; let p=getPos(e); handleTap(p.x, p.y); });
+            canvas.addEventListener('pointermove', (e) => { if(state==='EDITOR' && drawing) { let p=getPos(e); handleEdit(p.x, p.y); } });
+            window.addEventListener('pointerup', () => drawing=false);
+            
+            document.getElementById('high-score-display').innerText = Store.load('hs') || 0;
+            requestAnimationFrame(loop);
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "name": "Kingdom Defense: Endless Vector",
+  "description": "An endless vector tower defense roguelike game featuring heroes, elemental boons, custom map editor, and tactical defenses.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
